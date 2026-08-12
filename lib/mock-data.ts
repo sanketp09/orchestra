@@ -1,0 +1,198 @@
+import type { Vendor, Decision, EvidenceItem, ActivityItem, TimelineEvent } from "@/types";
+
+export const MOCK_VENDORS: Vendor[] = [
+  {
+    id: "v1",
+    name: "ABC Steel",
+    code: "VEN-882",
+    trustScore: 84,
+    scoreChange: -4,
+    status: "flagged",
+    category: "Structural Steel & Metalwork",
+    msaStatus: "Active",
+    coiStatus: "Expiring in 12 days",
+    activeContractsCount: 3,
+    openDisputesCount: 3,
+    lastActivity: "2h ago",
+  },
+  {
+    id: "v2",
+    name: "Steel Rebar Co.",
+    code: "VEN-904",
+    trustScore: 42,
+    scoreChange: -18,
+    status: "flagged",
+    category: "Concrete Reinforcement",
+    msaStatus: "Under Review",
+    coiStatus: "Expired 43 days ago",
+    activeContractsCount: 2,
+    openDisputesCount: 2,
+    lastActivity: "12m ago",
+  },
+  {
+    id: "v3",
+    name: "Ferrovial MEP",
+    code: "VEN-410",
+    trustScore: 91,
+    scoreChange: 2,
+    status: "verified",
+    category: "Mechanical, Electrical & Plumbing",
+    msaStatus: "Renewal Window",
+    coiStatus: "Verified & Current",
+    activeContractsCount: 5,
+    openDisputesCount: 0,
+    lastActivity: "1d ago",
+  },
+];
+
+export const MOCK_DECISIONS: Decision[] = [
+  {
+    id: "d1",
+    severity: "danger",
+    title: "Supplier trust score dropped sharply — Steel Rebar Co.",
+    context: "Down 18 points in 72 hours, driven by two missed inspection reports.",
+    actionLabel: "Review evidence",
+    trustScore: 42,
+    href: "/vendor/v2",
+    vendorId: "v2",
+    urgency: 95,
+  },
+  {
+    id: "d2",
+    severity: "warning",
+    title: "Anchor bolt reorder needs approval",
+    context: "Procurement flagged a shortfall against Thursday's delivery window.",
+    actionLabel: "Review quote (X-Ray)",
+    href: "/xray",
+    vendorId: "v1",
+    urgency: 80,
+  },
+  {
+    id: "d3",
+    severity: "warning",
+    title: "MEP contract renewal window closing",
+    context: "Ferrovial MEP contract expires in 9 days — no response logged yet.",
+    actionLabel: "Review contract",
+    href: "/vendor/v3",
+    vendorId: "v3",
+    urgency: 70,
+  },
+  {
+    id: "d4",
+    severity: "info",
+    title: "Faster supplier available for precast panels",
+    context: "Alternate vendor quote could cut lead time by 6 days at similar cost.",
+    actionLabel: "View recommendation",
+    href: "/evidence",
+    urgency: 50,
+  },
+];
+
+export const MOCK_ACTIVITY: ActivityItem[] = [
+  { id: "a1", text: "Trust score recalculated for Steel Rebar Co.", actor: "ORCHESTRA", timestamp: "12m ago" },
+  { id: "a2", text: "Purchase request #4471 submitted", actor: "Priya N.", timestamp: "1h ago" },
+  { id: "a3", text: "New inspection report ingested for Site 4", actor: "ORCHESTRA", timestamp: "3h ago" },
+  { id: "a4", text: "Contract addendum uploaded — Ferrovial MEP", actor: "Marcus T.", timestamp: "Yesterday" },
+  { id: "a5", text: "Supplier reliability review completed", actor: "ORCHESTRA", timestamp: "Yesterday" },
+];
+
+export const MOCK_ACTIVITIES = MOCK_ACTIVITY;
+
+export const MOCK_EVIDENCE: EvidenceItem[] = [
+  {
+    id: "e1",
+    title: "Insurance certificate — expired 43 days prior",
+    type: "document",
+    source: "Steel Rebar Co. COI Archive",
+    date: "Mar 4, 2026",
+    confidencePct: 88,
+    vendorId: "v2",
+    summary: "Certificate of insurance excluded from Meridian Steelworks quote package.",
+    status: "flagged",
+  },
+  {
+    id: "e2",
+    title: "Bid variance — 22% above trailing average",
+    type: "invoice",
+    source: "RSMeans Regional Index Q2",
+    date: "Mar 4, 2026",
+    confidencePct: 94,
+    vendorId: "v1",
+    summary: "Switchgear line item sits well above comparable recent bids for this scope.",
+    status: "flagged",
+  },
+  {
+    id: "e3",
+    title: "Inspection report — Site 4",
+    type: "inspection",
+    source: "Site 4 Safety & Quality Audit",
+    date: "Mar 2, 2026",
+    confidencePct: 99,
+    vendorId: "v2",
+    summary: "Two missed inspection windows logged against concrete reinforcement sub.",
+    status: "verified",
+  },
+];
+
+export const MOCK_TIMELINE_EVENTS: TimelineEvent[] = [
+  {
+    id: "evt-1",
+    title: "Quote received from Meridian Steelworks",
+    date: "Mar 3, 2026",
+    tone: "info",
+    receipt: {
+      evidence: ["Quote #Q-4471", "Switchgear package, Tower B"],
+      confidencePct: 96,
+      reasoning: "Quote parsed cleanly against the approved scope of work.",
+      href: "/evidence",
+    },
+  },
+  {
+    id: "evt-2",
+    title: "Trustline flagged pricing 18% above market",
+    date: "Mar 4, 2026",
+    tone: "warning",
+    receipt: {
+      evidence: ["RSMeans regional index, Q2", "Riverside Yards final invoice"],
+      confidencePct: 94,
+      reasoning: "Switchgear line item sits well above comparable recent bids.",
+      href: "/evidence",
+    },
+  },
+  {
+    id: "evt-3",
+    title: "Missing insurance clause detected",
+    date: "Mar 4, 2026",
+    tone: "danger",
+    receipt: {
+      evidence: ["Master services agreement, §7.2", "Vendor COI archive"],
+      confidencePct: 88,
+      reasoning: "Certificate of insurance excluded from the submitted quote package.",
+      href: "/evidence",
+    },
+  },
+  {
+    id: "evt-4",
+    title: "Atlas flagged a regional lumber shortage",
+    date: "Mar 6, 2026",
+    tone: "ai",
+    receipt: {
+      evidence: ["Regional supplier index", "3 correlated news sources"],
+      confidencePct: 76,
+      reasoning: "Supply signal may affect framing procurement later this phase.",
+      href: "/evidence",
+    },
+  },
+  {
+    id: "evt-5",
+    title: "Vendor certification verified",
+    date: "Mar 9, 2026",
+    tone: "success",
+    receipt: {
+      evidence: ["AISC registry", "Certification #AC-88213"],
+      confidencePct: 99,
+      reasoning: "Certification confirmed current and matched to this vendor.",
+      href: "/evidence",
+    },
+  },
+];
