@@ -4,7 +4,7 @@ Trustline - vendor trust intelligence microservice.
 Called only by ORCHESTRA over HTTP. Every endpoint accepts a small
 Trustline-specific request body (see models.py), does its work, and wraps
 the result into a common.models.AgentResult - including on failure, where it
-returns status="failed" with a clear error in findings rather than letting an
+returns status="FAILED" with a clear error in findings rather than letting an
 exception surface as a raw 500.
 """
 
@@ -42,7 +42,7 @@ def _failed_result(task_id: str, error: str) -> AgentResult:
     return AgentResult(
         agent=AGENT_NAME,
         task_id=task_id,
-        status="failed",
+        status="FAILED",
         findings=[{"error": error}],
         claims=[],
         evidence=[],
@@ -69,7 +69,7 @@ def get_vendor_profile(req: GetVendorProfileRequest) -> AgentResult:
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="completed",
+            status="COMPLETED",
             findings=[profile],
             claims=[],
             evidence=[f"trust_profiles:{req.vendor_id}"],
@@ -99,7 +99,7 @@ def assess_vendor_reliability(req: AssessVendorReliabilityRequest) -> AgentResul
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="completed",
+            status="COMPLETED",
             findings=[{"vendor_id": req.vendor_id, "dimension": req.dimension, **assessment}],
             claims=[],
             evidence=[f"trust_events:{req.vendor_id}:{req.dimension}"],
@@ -127,7 +127,7 @@ def detect_behavioural_drift(req: DetectBehaviouralDriftRequest) -> AgentResult:
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="completed",
+            status="COMPLETED",
             findings=findings,
             claims=[],
             evidence=[f"trust_events:{req.vendor_id}"],
@@ -155,7 +155,7 @@ def update_trust(req: UpdateTrustRequest) -> AgentResult:
                 return AgentResult(
                     agent=AGENT_NAME,
                     task_id=task_id,
-                    status="completed",
+                    status="COMPLETED",
                     findings=[{
                         "already_processed": True,
                         "source_event_id": source_event_id,
@@ -226,7 +226,7 @@ def update_trust(req: UpdateTrustRequest) -> AgentResult:
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="completed",
+            status="COMPLETED",
             findings=[persisted],
             claims=[
                 {
@@ -279,7 +279,7 @@ def compare_vendor_history(req: CompareVendorHistoryRequest) -> AgentResult:
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="completed" if not missing else "needs_more_evidence",
+            status="COMPLETED" if not missing else "INSUFFICIENT_INFORMATION",
             findings=profiles,
             claims=[{"note": note, "missing_vendor_ids": missing}],
             evidence=[f"trust_profiles:{vid}" for vid in req.vendor_ids],

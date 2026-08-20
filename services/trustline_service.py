@@ -93,7 +93,7 @@ class TrustlineService:
         elif cap_name in ["trustline.compare_vendor_history", "compare_vendor_history"]:
             return self.compare_vendor_history(task)
         else:
-            return self.get_vendor_profile(task)
+            return self._error_result(task.task_id, "INVALID_INPUT", f"Unknown capability: {cap_name}")
 
     def _create_receipt(self, task_id: str, summary: str, confidence: float, reasoning: str, evidence_ids: List[str]) -> Receipt:
         receipt_id = f"rcpt_trustline_{uuid.uuid4().hex[:8]}"
@@ -114,7 +114,7 @@ class TrustlineService:
         return AgentResult(
             agent="trustline",
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             error={
                 "code": code,
                 "message": message,
@@ -168,7 +168,7 @@ class TrustlineService:
             return AgentResult(
                 agent="trustline",
                 task_id=task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[profile],
                 evidence=[f"trust_profiles:{vendor_id}"],
                 confidence=0.96,
@@ -209,7 +209,7 @@ class TrustlineService:
             return AgentResult(
                 agent="trustline",
                 task_id=task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[{"vendor_id": vendor_id, "dimension": dim, "project_id": project_id, **assessment}],
                 evidence=[f"trust_events:{vendor_id}:{dim}"],
                 confidence=0.93,
@@ -248,7 +248,7 @@ class TrustlineService:
             return AgentResult(
                 agent="trustline",
                 task_id=task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=drift_findings if drift_findings else [{"vendor_id": vendor_id, "drift_detected": False, "drift_signals": [], "project_id": project_id}],
                 evidence=[f"trust_events:{vendor_id}"],
                 confidence=0.91,
@@ -295,7 +295,7 @@ class TrustlineService:
                     return AgentResult(
                         agent="trustline",
                         task_id=task_id,
-                        status="completed",
+                        status="COMPLETED",
                         findings=[{
                             "already_processed": True,
                             "source_event_id": source_event_id,
@@ -372,7 +372,7 @@ class TrustlineService:
             return AgentResult(
                 agent="trustline",
                 task_id=task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[{
                     "already_processed": False,
                     "vendor_id": vendor_id,
@@ -442,7 +442,7 @@ class TrustlineService:
             return AgentResult(
                 agent="trustline",
                 task_id=task_id,
-                status="completed" if not missing else "needs_more_evidence",
+                status="COMPLETED" if not missing else "INSUFFICIENT_INFORMATION",
                 findings=profiles,
                 claims=[{"note": note, "missing_vendor_ids": missing}],
                 evidence=[f"trust_profiles:{vid}" for vid in vendor_ids],
@@ -463,26 +463,18 @@ trustline_service = TrustlineService()
 
 from common.health import get_specialist_capabilities_manifest
 
+@router.get("/health")
+async def get_trustline_health():
+    return {
+        "service": "trustline",
+        "status": "healthy",
+        "version": "1.0"
+    }
+
 @router.get("/capabilities")
 async def get_trustline_capabilities():
     return get_specialist_capabilities_manifest("trustline")
 
-@router.post("/get_vendor_profile")
-async def api_get_vendor_profile(payload: Any = Body(...)):
-    return trustline_service.get_vendor_profile(payload)
-
-@router.post("/assess_vendor_reliability")
-async def api_assess_vendor_reliability(payload: Any = Body(...)):
-    return trustline_service.assess_vendor_reliability(payload)
-
-@router.post("/detect_behavioural_drift")
-async def api_detect_behavioural_drift(payload: Any = Body(...)):
-    return trustline_service.detect_behavioural_drift(payload)
-
-@router.post("/update_trust")
-async def api_update_trust(payload: Any = Body(...)):
-    return trustline_service.update_trust(payload)
-
-@router.post("/compare_vendor_history")
-async def api_compare_vendor_history(payload: Any = Body(...)):
-    return trustline_service.compare_vendor_history(payload)
+@router.post("/execute")
+async def api_execute(task: AgentTask = Body(...)):
+    return trustline_service.execute_task(task)

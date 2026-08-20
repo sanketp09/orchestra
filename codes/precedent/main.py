@@ -71,7 +71,7 @@ def _build_result(
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="needs_more_evidence",
+            status="INSUFFICIENT_INFORMATION",
             findings=[{"message": no_match_message, "checked_candidates": len(cases)}],
             claims=[],
             evidence=[],
@@ -96,7 +96,7 @@ def _build_result(
     return AgentResult(
         agent=AGENT_NAME,
         task_id=task_id,
-        status="completed",
+        status="COMPLETED",
         findings=findings,
         claims=[],
         evidence=[c["case_id"] for c in strong],
@@ -111,7 +111,7 @@ def _failed_result(task_id: str, message: str) -> AgentResult:
     return AgentResult(
         agent=AGENT_NAME,
         task_id=task_id,
-        status="failed",
+        status="FAILED",
         findings=[{"message": message}],
         claims=[],
         evidence=[],
@@ -190,7 +190,7 @@ def retrieve_previous_outcome(req: RetrievePreviousOutcomeRequest) -> AgentResul
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="needs_more_evidence",
+            status="INSUFFICIENT_INFORMATION",
             findings=[{"message": f"No case found with case_id={req.case_id}"}],
             claims=[],
             evidence=[],
@@ -203,7 +203,7 @@ def retrieve_previous_outcome(req: RetrievePreviousOutcomeRequest) -> AgentResul
     return AgentResult(
         agent=AGENT_NAME,
         task_id=task_id,
-        status="completed",
+        status="COMPLETED",
         findings=[case],
         claims=[],
         evidence=[case["case_id"]],

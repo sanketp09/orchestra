@@ -27,7 +27,7 @@ def test_get_vendor_profile_endpoint():
     assert res.status_code == 200
     data = res.json()
     assert data["agent"] == "trustline"
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert len(data["findings"]) == 1
     assert data["findings"][0]["vendor_id"] == "vendor_apex"
 
@@ -36,7 +36,7 @@ def test_assess_vendor_reliability_endpoint():
     res = client.post("/assess_vendor_reliability", json={"vendor_id": "vendor_apex", "dimension": "schedule_reliability"})
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert data["findings"][0]["dimension"] == "schedule_reliability"
     assert "trend" in data["findings"][0]
 
@@ -45,7 +45,7 @@ def test_detect_behavioural_drift_endpoint():
     res = client.post("/detect_behavioural_drift", json={"vendor_id": "vendor_apex"})
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert isinstance(data["findings"], list)
 
 
@@ -66,7 +66,7 @@ def test_update_trust_endpoint_external_cause():
     res = client.post("/update_trust", json=payload)
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert len(data["claims"]) == 1
     assert data["claims"][0]["external_cause"] is True
     # Applied delta should be tiny penalty (-0.005)
@@ -86,7 +86,7 @@ def test_update_trust_endpoint_vendor_fault():
     res = client.post("/update_trust", json=payload)
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert data["claims"][0]["external_cause"] is False
     assert data["claims"][0]["applied_delta"] == -0.10
 
@@ -95,6 +95,6 @@ def test_compare_vendor_history_endpoint():
     res = client.post("/compare_vendor_history", json={"vendor_ids": ["vendor_apex", "vendor_meridian"]})
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert len(data["findings"]) == 2
     assert "note" in data["claims"][0]

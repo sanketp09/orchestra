@@ -32,7 +32,7 @@ function. Create this once in Supabase (SQL editor):
     $$;
 
 If that RPC isn't set up yet, `search_cases` will raise — the route handlers
-catch that and return status="failed" per the general requirements.
+catch that and return status="FAILED" per the general requirements.
 """
 
 from common.embedding_client import embed

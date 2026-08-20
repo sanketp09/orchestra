@@ -76,7 +76,7 @@ class ArbiterService:
         elif cap_name == "arbiter.run_debate":
             return self.run_debate(task)
         else:
-            return self.analyze_causation(task)
+            return self._error_result(task.task_id, "INVALID_INPUT", f"Unknown capability: {cap_name}")
 
     def _new_receipt(self) -> str:
         return f"rcpt_arbiter_{uuid.uuid4().hex[:8]}"
@@ -117,7 +117,7 @@ class ArbiterService:
         return AgentResult(
             agent="arbiter",
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             error={
                 "code": code,
                 "message": message,
@@ -180,7 +180,7 @@ class ArbiterService:
             return AgentResult(
                 agent="arbiter",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[timeline_result],
                 evidence=evidence,
                 confidence=confidence,
@@ -218,7 +218,7 @@ class ArbiterService:
             return AgentResult(
                 agent="arbiter",
                 task_id=task.task_id,
-                status="needs_more_evidence",
+                status="INSUFFICIENT_INFORMATION",
                 findings=[{"message": "evidence_context is too thin to reach a confident causation conclusion."}],
                 recommended_next_capabilities=logic.missing_capabilities_for(evidence_context, None),
                 receipt_id=receipt_id
@@ -280,7 +280,7 @@ class ArbiterService:
             return AgentResult(
                 agent="arbiter",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=causes,
                 claims=claims,
                 evidence=evidence_refs,
@@ -347,7 +347,7 @@ class ArbiterService:
             return AgentResult(
                 agent="arbiter",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[result],
                 evidence=["causation_result"],
                 confidence=1.0 if is_valid else 0.5,
@@ -383,7 +383,7 @@ class ArbiterService:
             return AgentResult(
                 agent="arbiter",
                 task_id=task.task_id,
-                status="needs_more_evidence",
+                status="INSUFFICIENT_INFORMATION",
                 findings=[{"message": "full_context does not contain enough verified evidence for a full dispute analysis."}],
                 recommended_next_capabilities=logic.missing_capabilities_for(evidence_context, None),
                 receipt_id=receipt_id
@@ -424,7 +424,7 @@ class ArbiterService:
             return AgentResult(
                 agent="arbiter",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[
                     {
                         "timeline": result["timeline"],
@@ -463,7 +463,7 @@ class ArbiterService:
             return AgentResult(
                 agent="arbiter",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[verdict],
                 evidence=list(evidence_context.keys()),
                 confidence=0.8,
@@ -482,26 +482,18 @@ arbiter_service = ArbiterService()
 
 from common.health import get_specialist_capabilities_manifest
 
+@router.get("/health")
+async def get_arbiter_health():
+    return {
+        "service": "arbiter",
+        "status": "healthy",
+        "version": "1.0"
+    }
+
 @router.get("/capabilities")
 async def get_arbiter_capabilities():
     return get_specialist_capabilities_manifest("arbiter")
 
-@router.post("/reconstruct_timeline")
-async def api_reconstruct_timeline(task: AgentTask = Body(...)):
-    return arbiter_service.reconstruct_timeline(task)
-
-@router.post("/analyze_causation")
-async def api_analyze_causation(task: AgentTask = Body(...)):
-    return arbiter_service.analyze_causation(task)
-
-@router.post("/assess_responsibility")
-async def api_assess_responsibility(task: AgentTask = Body(...)):
-    return arbiter_service.assess_responsibility(task)
-
-@router.post("/analyze_dispute")
-async def api_analyze_dispute(task: AgentTask = Body(...)):
-    return arbiter_service.analyze_dispute(task)
-
-@router.post("/run_debate")
-async def api_run_debate(task: AgentTask = Body(...)):
-    return arbiter_service.run_debate(task)
+@router.post("/execute")
+async def api_execute(task: AgentTask = Body(...)):
+    return arbiter_service.execute_task(task)

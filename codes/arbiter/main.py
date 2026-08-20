@@ -107,7 +107,7 @@ def reconstruct_timeline(req: ReconstructTimelineRequest):
         )
         return AgentResult(
             task_id=task_id,
-            status="needs_more_evidence",
+            status="INSUFFICIENT_INFORMATION",
             findings=[{"message": "No event_refs provided — cannot reconstruct a timeline."}],
             recommended_next_capabilities=["sentinel.find_missing_evidence"],
             receipt_id=receipt_id,
@@ -128,7 +128,7 @@ def reconstruct_timeline(req: ReconstructTimelineRequest):
         )
         return AgentResult(
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             findings=[{"error": f"Timeline reconstruction failed: {exc}"}],
             receipt_id=receipt_id,
         )
@@ -165,7 +165,7 @@ def reconstruct_timeline(req: ReconstructTimelineRequest):
 
     return AgentResult(
         task_id=task_id,
-        status="completed",
+        status="COMPLETED",
         findings=[timeline_result],
         evidence=evidence,
         confidence=confidence,
@@ -196,7 +196,7 @@ def analyze_causation(req: AnalyzeCausationRequest):
         )
         return AgentResult(
             task_id=task_id,
-            status="needs_more_evidence",
+            status="INSUFFICIENT_INFORMATION",
             findings=[{"message": "evidence_context is too thin to reach a confident causation conclusion."}],
             recommended_next_capabilities=logic.missing_capabilities_for(
                 req.evidence_context, req.timeline
@@ -218,7 +218,7 @@ def analyze_causation(req: AnalyzeCausationRequest):
         )
         return AgentResult(
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             findings=[{"error": f"Causation analysis failed: {exc}"}],
             receipt_id=receipt_id,
         )
@@ -277,7 +277,7 @@ def analyze_causation(req: AnalyzeCausationRequest):
 
     return AgentResult(
         task_id=task_id,
-        status="completed",
+        status="COMPLETED",
         findings=causes,
         claims=req.claims,
         evidence=evidence_refs,
@@ -304,7 +304,7 @@ def assess_responsibility(req: AssessResponsibilityRequest):
         if not req.causation_result_id:
             return AgentResult(
                 task_id=task_id,
-                status="needs_more_evidence",
+                status="INSUFFICIENT_INFORMATION",
                 findings=[{"message": "Provide either causation_result_id or causes."}],
                 recommended_next_capabilities=["arbiter.analyze_causation"],
                 receipt_id=receipt_id,
@@ -324,7 +324,7 @@ def assess_responsibility(req: AssessResponsibilityRequest):
         except Exception as exc:
             return AgentResult(
                 task_id=task_id,
-                status="failed",
+                status="FAILED",
                 findings=[{"error": f"Failed to fetch causation_result {req.causation_result_id}: {exc}"}],
                 receipt_id=receipt_id,
             )
@@ -332,7 +332,7 @@ def assess_responsibility(req: AssessResponsibilityRequest):
     if not causes:
         return AgentResult(
             task_id=task_id,
-            status="needs_more_evidence",
+            status="INSUFFICIENT_INFORMATION",
             findings=[{"message": "No causes available to attribute responsibility against."}],
             recommended_next_capabilities=["arbiter.analyze_causation"],
             receipt_id=receipt_id,
@@ -343,7 +343,7 @@ def assess_responsibility(req: AssessResponsibilityRequest):
     except Exception as exc:
         return AgentResult(
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             findings=[{"error": f"Responsibility assessment failed: {exc}"}],
             receipt_id=receipt_id,
         )
@@ -380,7 +380,7 @@ def assess_responsibility(req: AssessResponsibilityRequest):
 
     return AgentResult(
         task_id=task_id,
-        status="completed",
+        status="COMPLETED",
         findings=[result],
         confidence=1.0 if is_valid else 0.5,
         risks=[] if is_valid else [f"Responsibility values summed to {total_pct}, not 1.0."],
@@ -416,7 +416,7 @@ def analyze_dispute(req: AnalyzeDisputeRequest):
         )
         return AgentResult(
             task_id=task_id,
-            status="needs_more_evidence",
+            status="INSUFFICIENT_INFORMATION",
             findings=[{"message": "full_context does not contain enough verified evidence for a full dispute analysis."}],
             recommended_next_capabilities=logic.missing_capabilities_for(evidence_context, None),
             receipt_id=receipt_id,
@@ -436,7 +436,7 @@ def analyze_dispute(req: AnalyzeDisputeRequest):
         )
         return AgentResult(
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             findings=[{"error": f"Full dispute analysis failed: {exc}"}],
             receipt_id=receipt_id,
         )
@@ -504,7 +504,7 @@ def analyze_dispute(req: AnalyzeDisputeRequest):
 
     return AgentResult(
         task_id=task_id,
-        status="completed",
+        status="COMPLETED",
         findings=[
             {
                 "timeline": result["timeline"],
@@ -533,7 +533,7 @@ def run_debate(req: RunDebateRequest):
     except Exception as exc:
         return AgentResult(
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             findings=[{"error": f"Debate failed: {exc}"}],
             receipt_id=receipt_id,
         )
@@ -551,7 +551,7 @@ def run_debate(req: RunDebateRequest):
 
     return AgentResult(
         task_id=task_id,
-        status="completed",
+        status="COMPLETED",
         findings=[verdict],
         receipt_id=receipt_id,
         confidence=0.8

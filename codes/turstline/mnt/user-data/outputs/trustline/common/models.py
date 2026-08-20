@@ -26,7 +26,7 @@ class AgentTask(BaseModel):
 class AgentResult(BaseModel):
     agent: str
     task_id: str
-    status: Literal["completed", "needs_more_evidence", "failed"]
+    status: Literal["COMPLETED", "INSUFFICIENT_INFORMATION", "FAILED"]
     findings: list[dict] = Field(default_factory=list)
     claims: list[dict] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)

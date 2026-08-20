@@ -74,7 +74,7 @@ def test_verify_claim_evidence_supports():
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "completed"
+    assert body["status"] == "COMPLETED"
     assert body["confidence"] == pytest.approx(0.9)
     assert body["findings"][0]["verdict"] == "supported"
     assert body["evidence"] == ["ev-1"]
@@ -112,7 +112,7 @@ def test_verify_claim_evidence_contradicts():
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "completed"
+    assert body["status"] == "COMPLETED"
     assert body["findings"][0]["verdict"] == "contradicted"
     assert body["findings"][0]["contradiction_details"]
 
@@ -138,6 +138,6 @@ def test_verify_claim_no_evidence_needs_more_evidence():
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "needs_more_evidence"
+    assert body["status"] == "INSUFFICIENT_INFORMATION"
     assert body["confidence"] == 0.0
     assert "sentinel.find_missing_evidence" in body["recommended_next_capabilities"]

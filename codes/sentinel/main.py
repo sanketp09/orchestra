@@ -40,7 +40,7 @@ def _failed_result(task_id: str, message: str) -> AgentResult:
     return AgentResult(
         agent=AGENT_NAME,
         task_id=task_id,
-        status="failed",
+        status="FAILED",
         findings=[{"error": message}],
         confidence=0.0,
         receipt_id=_new_receipt_id(),
@@ -48,7 +48,7 @@ def _failed_result(task_id: str, message: str) -> AgentResult:
 
 
 def _status_for_confidence(confidence: float) -> str:
-    return "completed" if confidence >= logic.CONFIDENCE_THRESHOLD else "needs_more_evidence"
+    return "COMPLETED" if confidence >= logic.CONFIDENCE_THRESHOLD else "INSUFFICIENT_INFORMATION"
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ def verify_claim_endpoint(
             return AgentResult(
                 agent=AGENT_NAME,
                 task_id=task_id,
-                status="needs_more_evidence",
+                status="INSUFFICIENT_INFORMATION",
                 findings=[{"reason": result["explanation"]}],
                 confidence=0.0,
                 recommended_next_capabilities=["sentinel.find_missing_evidence"],
@@ -111,7 +111,7 @@ def verify_claim_endpoint(
 
         status = _status_for_confidence(result["confidence"])
         recommended = (
-            ["sentinel.find_missing_evidence"] if status == "needs_more_evidence" else []
+            ["sentinel.find_missing_evidence"] if status == "INSUFFICIENT_INFORMATION" else []
         )
 
         return AgentResult(
@@ -218,7 +218,7 @@ def find_missing_evidence_endpoint(
         return AgentResult(
             agent=AGENT_NAME,
             task_id=task_id,
-            status="completed",
+            status="COMPLETED",
             findings=[{"gap": gap} for gap in result.gaps],
             confidence=confidence,
             evidence=body.available_evidence_refs,
@@ -243,7 +243,7 @@ def verify_progress_endpoint(
 
         status = _status_for_confidence(result.confidence)
         recommended = (
-            ["sentinel.find_missing_evidence"] if status == "needs_more_evidence" else []
+            ["sentinel.find_missing_evidence"] if status == "INSUFFICIENT_INFORMATION" else []
         )
 
         return AgentResult(

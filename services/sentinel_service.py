@@ -88,7 +88,7 @@ class SentinelService:
         elif cap_name == "sentinel.verify_invoice":
             return self.verify_invoice(task)
         else:
-            return self.verify_claim(task)
+            return self._error_result(task.task_id, "INVALID_INPUT", f"Unknown capability: {cap_name}")
 
     def _create_receipt(self, task_id: str, summary: str, confidence: float, reasoning: str, evidence_ids: List[str]) -> Receipt:
         receipt_id = f"rcpt_sentinel_{uuid.uuid4().hex[:8]}"
@@ -109,7 +109,7 @@ class SentinelService:
         return AgentResult(
             agent="sentinel",
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             error={
                 "code": code,
                 "message": message,
@@ -165,7 +165,7 @@ class SentinelService:
             return AgentResult(
                 agent="sentinel",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[
                     {
                         "feature_id": result.feature_id,
@@ -197,7 +197,7 @@ class SentinelService:
             return AgentResult(
                 agent="sentinel",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[{"comparison": synthesis}],
                 evidence=doc_refs,
                 confidence=0.94,
@@ -233,7 +233,7 @@ class SentinelService:
             return AgentResult(
                 agent="sentinel",
                 task_id=task.task_id,
-                status="needs_more_evidence",
+                status="INSUFFICIENT_INFORMATION",
                 findings=[{"missing_evidence_gaps": missing}],
                 evidence=submitted,
                 confidence=0.91,
@@ -259,7 +259,7 @@ class SentinelService:
             return AgentResult(
                 agent="sentinel",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[{"claimed_percent": claimed, "verified_percent": verified, "variance": round(claimed - verified, 2)}],
                 evidence=photos,
                 confidence=0.92,
@@ -283,7 +283,7 @@ class SentinelService:
             return AgentResult(
                 agent="sentinel",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[{"match": False, "anomalies": anomalies}],
                 evidence=[inv, po],
                 confidence=0.95,
@@ -304,30 +304,18 @@ sentinel_service = SentinelService()
 
 from common.health import get_specialist_capabilities_manifest
 
+@router.get("/health")
+async def get_sentinel_health():
+    return {
+        "service": "sentinel",
+        "status": "healthy",
+        "version": "1.0"
+    }
+
 @router.get("/capabilities")
 async def get_sentinel_capabilities():
     return get_specialist_capabilities_manifest("sentinel")
 
-@router.post("/verify_claim")
-async def api_verify_claim(task: AgentTask = Body(...)):
-    return sentinel_service.verify_claim(task)
-
-@router.post("/compare_documents")
-async def api_compare_documents(task: AgentTask = Body(...)):
-    return sentinel_service.compare_documents(task)
-
-@router.post("/detect_contradiction")
-async def api_detect_contradiction(task: AgentTask = Body(...)):
-    return sentinel_service.detect_contradiction(task)
-
-@router.post("/find_missing_evidence")
-async def api_find_missing_evidence(task: AgentTask = Body(...)):
-    return sentinel_service.find_missing_evidence(task)
-
-@router.post("/verify_progress")
-async def api_verify_progress(task: AgentTask = Body(...)):
-    return sentinel_service.verify_progress(task)
-
-@router.post("/verify_invoice")
-async def api_verify_invoice(task: AgentTask = Body(...)):
-    return sentinel_service.verify_invoice(task)
+@router.post("/execute")
+async def api_execute(task: AgentTask = Body(...)):
+    return sentinel_service.execute_task(task)

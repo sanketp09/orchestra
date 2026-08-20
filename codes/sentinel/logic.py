@@ -153,7 +153,7 @@ def persist_verification(
 
 def _status_for_verdict(verdict: str | None, confidence: float) -> str:
     if confidence < CONFIDENCE_THRESHOLD or verdict is None:
-        return "needs_more_evidence"
+        return "INSUFFICIENT_INFORMATION"
     if verdict == "supported":
         return "verified"
     if verdict == "contradicted":

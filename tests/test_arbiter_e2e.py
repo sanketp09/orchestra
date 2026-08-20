@@ -97,7 +97,7 @@ def run_tests():
     print(f"  Responsibility Split: {responsibility}")
     
     # Assertions
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert responsibility["vendor"] == 1.0
     assert responsibility["external"] == 0.0
     assert data["receipt_id"].startswith("rcpt_arbiter_")
@@ -142,7 +142,7 @@ def run_tests():
     responsibility = data["findings"][0]["responsibility"]
     print(f"  Responsibility Split: {responsibility}")
     
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert responsibility["external"] == 1.0
     assert responsibility["vendor"] == 0.0
     print("Scenario 2 passed successfully.\n")
@@ -171,7 +171,7 @@ def run_tests():
     responsibility = data["findings"][0]["responsibility"]
     print(f"  Responsibility Split: {responsibility}")
     
-    assert data["status"] == "completed"
+    assert data["status"] == "COMPLETED"
     assert responsibility["vendor"] > 0.0
     assert responsibility["external"] > 0.0
     print("Scenario 3 passed successfully.\n")
@@ -192,7 +192,7 @@ def run_tests():
     print(f"  Status: {data['status']}")
     print(f"  Recommended next capabilities: {data['recommended_next_capabilities']}")
     
-    assert data["status"] == "needs_more_evidence"
+    assert data["status"] == "INSUFFICIENT_INFORMATION"
     assert "sentinel.find_missing_evidence" in data["recommended_next_capabilities"]
     print("Scenario 4 passed successfully.\n")
 

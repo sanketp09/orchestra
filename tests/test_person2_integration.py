@@ -62,7 +62,7 @@ def test_sentinel_service():
     result = sentinel_service.execute_task(task)
     assert isinstance(result, AgentResult)
     assert result.agent == "sentinel"
-    assert result.status in ["completed", "needs_more_evidence"]
+    assert result.status in ["COMPLETED", "INSUFFICIENT_INFORMATION"]
     assert len(result.receipt_id) > 0
 
 
@@ -115,8 +115,8 @@ def test_arbiter_service():
     )
     result = arbiter_service.execute_task(task)
     assert result.agent == "arbiter"
-    if result.status == "completed":
+    if result.status == "COMPLETED":
         assert "reasoning_summary" in result.findings[0]
     else:
-        assert result.status == "needs_more_evidence"
+        assert result.status == "INSUFFICIENT_INFORMATION"
         assert "message" in result.findings[0]

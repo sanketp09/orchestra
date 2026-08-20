@@ -45,7 +45,7 @@ def test_idempotency_duplicate_event_processing():
     res1 = client.post("/update_trust", json=payload)
     assert res1.status_code == 200
     data1 = res1.json()
-    assert data1["status"] == "completed"
+    assert data1["status"] == "COMPLETED"
     assert data1["claims"][0]["already_processed"] is False
 
     profile1 = db.fetch_trust_profile(vendor_id)
@@ -56,7 +56,7 @@ def test_idempotency_duplicate_event_processing():
     res2 = client.post("/update_trust", json=payload)
     assert res2.status_code == 200
     data2 = res2.json()
-    assert data2["status"] == "completed"
+    assert data2["status"] == "COMPLETED"
     assert data2["claims"][0]["already_processed"] is True
 
     profile2 = db.fetch_trust_profile(vendor_id)

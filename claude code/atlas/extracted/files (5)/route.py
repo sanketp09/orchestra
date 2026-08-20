@@ -92,7 +92,7 @@ TODAY = date(2026, 8, 12)
 # ---------------------------------------------------------------------------
 
 class WaypointStatus(str, Enum):
-    COMPLETED = "completed"
+    COMPLETED = "COMPLETED"
     CURRENT = "current"
     UPCOMING = "upcoming"
 

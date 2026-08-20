@@ -41,7 +41,7 @@ def generate_structured(prompt: str, schema: type[T]) -> T:
     is constrained to return JSON matching the Pydantic model's shape.
     Raises on malformed output rather than silently returning a half-parsed
     object - callers (specialist endpoints) are expected to catch this and
-    turn it into a status="failed" AgentResult.
+    turn it into a status="FAILED" AgentResult.
     """
     client = _get_client()
 

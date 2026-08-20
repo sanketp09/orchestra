@@ -76,7 +76,7 @@ class PrecedentService:
         elif cap_name == "precedent.retrieve_previous_outcome":
             return self.retrieve_previous_outcome(task)
         else:
-            return self.find_similar_case(task)
+            return self._error_result(task.task_id, "INVALID_INPUT", f"Unknown capability: {cap_name}")
 
     def _create_receipt(self, task_id: str, summary: str, confidence: float, reasoning: str, evidence_ids: List[str]) -> Receipt:
         receipt_id = f"rcpt_precedent_{uuid.uuid4().hex[:8]}"
@@ -97,7 +97,7 @@ class PrecedentService:
         return AgentResult(
             agent="precedent",
             task_id=task_id,
-            status="failed",
+            status="FAILED",
             error={
                 "code": code,
                 "message": message,
@@ -146,7 +146,7 @@ class PrecedentService:
             return AgentResult(
                 agent="precedent",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[{"similar_cases": cases, "synthesis": synthesis}],
                 claims=[{"case_id": c["case_id"], "outcome": c["outcome"]} for c in cases],
                 evidence=[c["case_id"] for c in cases],
@@ -191,7 +191,7 @@ class PrecedentService:
             return AgentResult(
                 agent="precedent",
                 task_id=task.task_id,
-                status="completed",
+                status="COMPLETED",
                 findings=[res],
                 evidence=[case_id],
                 confidence=0.98,
@@ -210,26 +210,18 @@ precedent_service = PrecedentService()
 
 from common.health import get_specialist_capabilities_manifest
 
+@router.get("/health")
+async def get_precedent_health():
+    return {
+        "service": "precedent",
+        "status": "healthy",
+        "version": "1.0"
+    }
+
 @router.get("/capabilities")
 async def get_precedent_capabilities():
     return get_specialist_capabilities_manifest("precedent")
 
-@router.post("/find_similar_case")
-async def api_find_similar_case(task: AgentTask = Body(...)):
-    return precedent_service.find_similar_case(task)
-
-@router.post("/find_similar_vendor")
-async def api_find_similar_vendor(task: AgentTask = Body(...)):
-    return precedent_service.find_similar_vendor(task)
-
-@router.post("/find_similar_contract")
-async def api_find_similar_contract(task: AgentTask = Body(...)):
-    return precedent_service.find_similar_contract(task)
-
-@router.post("/find_similar_dispute")
-async def api_find_similar_dispute(task: AgentTask = Body(...)):
-    return precedent_service.find_similar_dispute(task)
-
-@router.post("/retrieve_previous_outcome")
-async def api_retrieve_previous_outcome(task: AgentTask = Body(...)):
-    return precedent_service.retrieve_previous_outcome(task)
+@router.post("/execute")
+async def api_execute(task: AgentTask = Body(...)):
+    return precedent_service.execute_task(task)

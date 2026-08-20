@@ -20,7 +20,7 @@ from common.llm_client import generate_structured
 
 def evidence_is_too_thin(evidence_context: dict | None) -> bool:
     """
-    Heuristic gate for status="needs_more_evidence". Arbiter should not
+    Heuristic gate for status="INSUFFICIENT_INFORMATION". Arbiter should not
     reason about causation with no verified evidence to reason over.
     """
     if not evidence_context:

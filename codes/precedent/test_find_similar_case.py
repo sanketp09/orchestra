@@ -40,7 +40,7 @@ def test_find_similar_case_returns_known_case_as_top_match():
     assert response.status_code == 200
 
     result = response.json()
-    assert result["status"] == "completed"
+    assert result["status"] == "COMPLETED"
     assert len(result["findings"]) > 0
 
     top_match = result["findings"][0]
