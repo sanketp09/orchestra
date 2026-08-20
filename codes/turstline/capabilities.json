@@ -1,0 +1,108 @@
+{
+  "agent": "trustline",
+  "capabilities": [
+    {
+      "name": "get_vendor_profile",
+      "description": "Retrieves comprehensive vendor trust profile across schedule, commercial, claim, quality, and financial dimensions. Does not compute trend or drift.",
+      "endpoint": "/get_vendor_profile",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "vendor_id": {"type": "string", "description": "The vendor to look up."}
+        },
+        "required": ["vendor_id"]
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "AgentResult with findings=[trust_profiles row]."
+      }
+    },
+    {
+      "name": "assess_vendor_reliability",
+      "description": "Evaluates a single reliability dimension for a vendor with historical trend. Does not check all dimensions for drift.",
+      "endpoint": "/assess_vendor_reliability",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "vendor_id": {"type": "string"},
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "schedule_reliability",
+              "commercial_reliability",
+              "claim_reliability",
+              "quality_reliability",
+              "financial_stability"
+            ],
+            "description": "Which trust_profiles column to assess."
+          }
+        },
+        "required": ["vendor_id", "dimension"]
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "AgentResult with findings=[{current_score, window_days, event_count, avg_impact_delta, trend}]."
+      }
+    },
+    {
+      "name": "detect_behavioural_drift",
+      "description": "Detects negative behavioral drift in vendor performance over time. Does not update trust scores.",
+      "endpoint": "/detect_behavioural_drift",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "vendor_id": {"type": "string"}
+        },
+        "required": ["vendor_id"]
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "AgentResult with findings=[{dimension, negative_event_count, window_days, avg_impact_delta, flag}, ...] (empty list if no drift)."
+      }
+    },
+    {
+      "name": "update_trust",
+      "description": "Dynamically updates vendor trust score based on verified findings and optional external context. Does not verify if the event actually happened.",
+      "endpoint": "/update_trust",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "vendor_id": {"type": "string"},
+          "verified_event": {
+            "type": "object",
+            "description": "Verified event details, e.g. {impact_dimension, impact_delta, event_type, vendor_at_fault}."
+          },
+          "external_context": {
+            "type": ["object", "null"],
+            "description": "Optional evidence of an external cause, e.g. {relevance: 0-1, explains_majority: bool, summary}."
+          }
+        },
+        "required": ["vendor_id", "verified_event"]
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "AgentResult with findings=[updated trust_profiles row], claims=[{external_cause, applied_delta, reason}]."
+      }
+    },
+    {
+      "name": "compare_vendor_history",
+      "description": "Compares historical reliability trajectories across multiple vendors for bid evaluation. Does not do single vendor deep dives.",
+      "endpoint": "/compare_vendor_history",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "vendor_ids": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2
+          }
+        },
+        "required": ["vendor_ids"]
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "AgentResult with findings=[profile_1, profile_2, ...] and claims=[{note: str}]."
+      }
+    }
+  ]
+}

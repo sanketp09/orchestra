@@ -1,0 +1,35 @@
+{
+  "agent": "sentinel",
+  "capabilities": [
+    {
+      "name": "verify_claim",
+      "endpoint": "/verify_claim",
+      "description": "Verifies whether a procurement, delivery, schedule, or vendor claim is supported, contradicted, or insufficiently supported by available evidence. Does not determine final blame, update vendor trust, or retrieve historical precedent."
+    },
+    {
+      "name": "compare_documents",
+      "endpoint": "/compare_documents",
+      "description": "Compares two or more procurement documents to detect discrepancies. Does not verify physical progress on site or assess vendor scorecards."
+    },
+    {
+      "name": "detect_contradiction",
+      "endpoint": "/detect_contradiction",
+      "description": "Performs deep semantic contradiction detection between a verbal/written claim and site logs or other evidence. Does not perform full verification verdict."
+    },
+    {
+      "name": "find_missing_evidence",
+      "endpoint": "/find_missing_evidence",
+      "description": "Identifies missing mandatory proof items required to validate a pay app or delay claim. Does not verify the claim itself."
+    },
+    {
+      "name": "verify_progress",
+      "endpoint": "/verify_progress",
+      "description": "Audits physical installation or offsite manufacturing progress claims against photo/telemetry evidence. Does not audit invoice pricing."
+    },
+    {
+      "name": "verify_invoice",
+      "endpoint": "/verify_invoice",
+      "description": "Audits line-item pricing, quantities, and terms against active PO and contract master records. Does not evaluate weather delays."
+    }
+  ]
+}

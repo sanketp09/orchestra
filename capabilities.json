@@ -1,0 +1,520 @@
+{
+  "version": "1.0",
+  "specialists": [
+    {
+      "name": "sentinel",
+      "availability": "available",
+      "capabilities": [
+        {
+          "id": "sentinel.verify_claim",
+          "name": "Verify Claim",
+          "description": "Verifies whether a procurement, delivery, schedule, or vendor claim is supported, contradicted, or insufficiently supported by available evidence.",
+          "use_when": [
+            "A claim requires evidence-based verification.",
+            "A reported event requires validation.",
+            "Conflicting evidence must be identified."
+          ],
+          "does_not": [
+            "determine final blame",
+            "update vendor trust",
+            "retrieve historical precedent"
+          ],
+          "endpoint": "/sentinel/verify_claim",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["claim_text"],
+            "optional": ["evidence_refs", "file_name", "project_id"]
+          },
+          "output_schema": "AgentResult",
+          "requires": [],
+          "requires_any": ["claim_text", "claim_id"],
+          "produces": ["verification_findings", "supporting_evidence", "contradictory_evidence", "confidence"],
+          "availability": "available"
+        },
+        {
+          "id": "sentinel.compare_documents",
+          "name": "Compare Documents",
+          "description": "Compares two or more procurement documents to detect discrepancies.",
+          "use_when": [
+            "Comparing PO vs Invoice vs Delivery Ticket.",
+            "Identifying inconsistencies across multiple project files."
+          ],
+          "does_not": [
+            "verify physical progress on site",
+            "assess vendor score card"
+          ],
+          "endpoint": "/sentinel/compare_documents",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["document_refs"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["document_refs"],
+          "requires_any": [],
+          "produces": ["discrepancies", "consistent", "summary"],
+          "availability": "available"
+        },
+        {
+          "id": "sentinel.detect_contradiction",
+          "name": "Detect Contradiction",
+          "description": "Performs deep semantic contradiction detection between a verbal/written claim and site logs or other evidence.",
+          "use_when": [
+            "Fast contradiction checks are needed for a new claim."
+          ],
+          "does_not": [
+            "perform full verification verdict"
+          ],
+          "endpoint": "/sentinel/detect_contradiction",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["claim_text", "evidence_refs"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["claim_text", "evidence_refs"],
+          "requires_any": [],
+          "produces": ["contradiction_found", "explanation"],
+          "availability": "available"
+        },
+        {
+          "id": "sentinel.find_missing_evidence",
+          "name": "Find Missing Evidence",
+          "description": "Identifies missing mandatory proof items required to validate a pay app or delay claim.",
+          "use_when": [
+            "A verification returns needs_more_evidence.",
+            "Auditing completeness of submittal package."
+          ],
+          "does_not": [
+            "verify the claim itself"
+          ],
+          "endpoint": "/sentinel/find_missing_evidence",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["claim_type"],
+            "optional": ["submitted_evidence"]
+          },
+          "output_schema": "AgentResult",
+          "requires": ["claim_type"],
+          "requires_any": [],
+          "produces": ["missing_evidence_gaps"],
+          "availability": "available"
+        },
+        {
+          "id": "sentinel.verify_progress",
+          "name": "Verify Progress",
+          "description": "Audits physical installation or offsite manufacturing progress claims against photo/telemetry evidence.",
+          "use_when": [
+            "A contractor claims a specific progress percentage.",
+            "Auditing field reports against photo evidence."
+          ],
+          "does_not": [
+            "audit invoice pricing"
+          ],
+          "endpoint": "/sentinel/verify_progress",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["claimed_percent", "photo_refs"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["claimed_percent", "photo_refs"],
+          "requires_any": [],
+          "produces": ["verified_percent", "confidence", "variance"],
+          "availability": "available"
+        },
+        {
+          "id": "sentinel.verify_invoice",
+          "name": "Verify Invoice",
+          "description": "Audits line-item pricing, quantities, and terms against active PO and contract master records.",
+          "use_when": [
+            "An invoice requires a 3-way match audit."
+          ],
+          "does_not": [
+            "evaluate weather delays"
+          ],
+          "endpoint": "/sentinel/verify_invoice",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["invoice_number", "po_number"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["invoice_number", "po_number"],
+          "requires_any": [],
+          "produces": ["match", "anomalies"],
+          "availability": "available"
+        }
+      ]
+    },
+    {
+      "name": "trustline",
+      "availability": "available",
+      "capabilities": [
+        {
+          "id": "trustline.get_vendor_profile",
+          "name": "Get Vendor Profile",
+          "description": "Retrieves comprehensive vendor trust profile across schedule, commercial, claim, quality, and financial dimensions.",
+          "use_when": [
+            "Need to see the latest static trust scores for a vendor."
+          ],
+          "does_not": [
+            "compute trend or drift"
+          ],
+          "endpoint": "/trustline/get_vendor_profile",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["vendor_id"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["vendor_id"],
+          "requires_any": [],
+          "produces": ["trust_profile"],
+          "availability": "available"
+        },
+        {
+          "id": "trustline.assess_vendor_reliability",
+          "name": "Assess Vendor Reliability",
+          "description": "Evaluates a single reliability dimension for a vendor with historical trend.",
+          "use_when": [
+            "Analyzing trend of a specific dimension over a window of time."
+          ],
+          "does_not": [
+            "check all dimensions for drift"
+          ],
+          "endpoint": "/trustline/assess_vendor_reliability",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["vendor_id", "dimension"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["vendor_id", "dimension"],
+          "requires_any": [],
+          "produces": ["trend", "current_score", "avg_impact_delta"],
+          "availability": "available"
+        },
+        {
+          "id": "trustline.detect_behavioural_drift",
+          "name": "Detect Behavioural Drift",
+          "description": "Detects negative behavioral drift in vendor performance over time.",
+          "use_when": [
+            "Needing early warning checks across all dimensions before contract renewal."
+          ],
+          "does_not": [
+            "update trust scores"
+          ],
+          "endpoint": "/trustline/detect_behavioural_drift",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["vendor_id"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["vendor_id"],
+          "requires_any": [],
+          "produces": ["drift_detected", "drift_signals"],
+          "availability": "available"
+        },
+        {
+          "id": "trustline.update_trust",
+          "name": "Update Trust",
+          "description": "Dynamically updates vendor trust score based on verified findings and optional external context.",
+          "use_when": [
+            "A new verified event needs to be recorded and penalties/adjustments applied."
+          ],
+          "does_not": [
+            "verify if the event actually happened"
+          ],
+          "endpoint": "/trustline/update_trust",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["vendor_id", "verified_event"],
+            "optional": ["external_context", "source_event_id"]
+          },
+          "output_schema": "AgentResult",
+          "requires": ["vendor_id", "verified_event"],
+          "requires_any": [],
+          "produces": ["previous_trust", "new_trust", "penalty_applied", "applied_delta"],
+          "availability": "available"
+        },
+        {
+          "id": "trustline.compare_vendor_history",
+          "name": "Compare Vendor History",
+          "description": "Compares historical reliability trajectories across multiple vendors for bid evaluation.",
+          "use_when": [
+            "Choosing between two or more vendors."
+          ],
+          "does_not": [
+            "do single vendor deep dive"
+          ],
+          "endpoint": "/trustline/compare_vendor_history",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["vendor_ids"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["vendor_ids"],
+          "requires_any": [],
+          "produces": ["rankings"],
+          "availability": "available"
+        }
+      ]
+    },
+    {
+      "name": "precedent",
+      "availability": "available",
+      "capabilities": [
+        {
+          "id": "precedent.find_similar_case",
+          "name": "Find Similar Case",
+          "description": "Searches historical dispute and claim archives using vector similarity to find matching precedents.",
+          "use_when": [
+            "Faced with a novel claim/situation and needing cross-type historical cases."
+          ],
+          "does_not": [
+            "determine current delay causation"
+          ],
+          "endpoint": "/precedent/find_similar_case",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["situation_description"],
+            "optional": ["entity_ids"]
+          },
+          "output_schema": "AgentResult",
+          "requires": ["situation_description"],
+          "requires_any": [],
+          "produces": ["similar_cases", "synthesis"],
+          "availability": "available"
+        },
+        {
+          "id": "precedent.find_similar_vendor",
+          "name": "Find Similar Vendor",
+          "description": "Matches vendor profile characteristics against historical vendor records to predict dispute risk.",
+          "use_when": [
+            "Evaluating vendor history precedent."
+          ],
+          "does_not": [
+            "find contract clause outcomes"
+          ],
+          "endpoint": "/precedent/find_similar_vendor",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["vendor_profile_summary"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["vendor_profile_summary"],
+          "requires_any": [],
+          "produces": ["similar_vendors"],
+          "availability": "available"
+        },
+        {
+          "id": "precedent.find_similar_contract",
+          "name": "Find Similar Contract",
+          "description": "Analyzes contract clause terms against historical contract disputes and resolution outcomes.",
+          "use_when": [
+            "Assessing clause risk during contract drafting."
+          ],
+          "does_not": [
+            "reconstruct project timelines"
+          ],
+          "endpoint": "/precedent/find_similar_contract",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["clause_text"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["clause_text"],
+          "requires_any": [],
+          "produces": ["similar_contracts"],
+          "availability": "available"
+        },
+        {
+          "id": "precedent.find_similar_dispute",
+          "name": "Find Similar Dispute",
+          "description": "Matches current dispute arguments against historical arbitration and litigation outcomes.",
+          "use_when": [
+            "Assessing outcome probabilities for an active disagreement."
+          ],
+          "does_not": [
+            "change vendor trust score"
+          ],
+          "endpoint": "/precedent/find_similar_dispute",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["dispute_description"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["dispute_description"],
+          "requires_any": [],
+          "produces": ["similar_disputes"],
+          "availability": "available"
+        },
+        {
+          "id": "precedent.retrieve_previous_outcome",
+          "name": "Retrieve Previous Outcome",
+          "description": "Retrieves granular decision outcome details for a specific historical case ID.",
+          "use_when": [
+            "Need to see full outcome text for a known case ID."
+          ],
+          "does_not": [
+            "perform vector search"
+          ],
+          "endpoint": "/precedent/retrieve_previous_outcome",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["case_id"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["case_id"],
+          "requires_any": [],
+          "produces": ["outcome"],
+          "availability": "available"
+        }
+      ]
+    },
+    {
+      "name": "arbiter",
+      "availability": "available",
+      "capabilities": [
+        {
+          "id": "arbiter.reconstruct_timeline",
+          "name": "Reconstruct Timeline",
+          "description": "Reconstructs a chronological sequence of events from raw evidence, logs, and claims.",
+          "use_when": [
+            "Organizing chaotic project logs into a structured timeline."
+          ],
+          "does_not": [
+            "determine responsibility splits"
+          ],
+          "endpoint": "/arbiter/reconstruct_timeline",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["event_refs"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["event_refs"],
+          "requires_any": [],
+          "produces": ["timeline"],
+          "availability": "available"
+        },
+        {
+          "id": "arbiter.analyze_causation",
+          "name": "Analyze Causation",
+          "description": "Identifies true root cause of project delay, defect, or dispute using multi-agent evidence context.",
+          "use_when": [
+            "A clear, evidence-cited root cause analysis is needed."
+          ],
+          "does_not": [
+            "retrieve contract precedents"
+          ],
+          "endpoint": "/arbiter/analyze_causation",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["claims", "evidence_context"],
+            "optional": ["timeline"]
+          },
+          "output_schema": "AgentResult",
+          "requires": ["claims", "evidence_context"],
+          "requires_any": [],
+          "produces": ["causes", "reasoning_summary"],
+          "availability": "available"
+        },
+        {
+          "id": "arbiter.assess_responsibility",
+          "name": "Assess Responsibility",
+          "description": "Attributes contractual responsibility and financial split percentage between vendor, buyer, and external factors.",
+          "use_when": [
+            "Quantifying fault percentages based on root causes."
+          ],
+          "does_not": [
+            "perform verify progress audits"
+          ],
+          "endpoint": "/arbiter/assess_responsibility",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["causes"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["causes"],
+          "requires_any": [],
+          "produces": ["responsibility_split"],
+          "availability": "available"
+        },
+        {
+          "id": "arbiter.analyze_dispute",
+          "name": "Analyze Dispute",
+          "description": "Runs full dispute analysis including timeline, causation, and responsibility attribution.",
+          "use_when": [
+            "Needing a full, end-to-end causal and responsibility assessment from project data."
+          ],
+          "does_not": [
+            "update vendor trust scorecards"
+          ],
+          "endpoint": "/arbiter/analyze_dispute",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["dispute_context"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["dispute_context"],
+          "requires_any": [],
+          "produces": ["timeline", "causes", "responsibility"],
+          "availability": "available"
+        },
+        {
+          "id": "arbiter.run_debate",
+          "name": "Run Debate",
+          "description": "Runs the 3-step adversarial debate: Buyer Advocate -> Vendor Advocate -> Judge.",
+          "use_when": [
+            "Engaging in structured adversarial reasoning for a complex dispute."
+          ],
+          "does_not": [
+            "do RAG vector precedent lookups"
+          ],
+          "endpoint": "/arbiter/run_debate",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["evidence_context"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["evidence_context"],
+          "requires_any": [],
+          "produces": ["buyer_case", "vendor_case", "judge_verdict"],
+          "availability": "available"
+        }
+      ]
+    }
+  ]
+}

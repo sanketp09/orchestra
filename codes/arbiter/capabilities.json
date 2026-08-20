@@ -1,0 +1,31 @@
+{
+  "agent": "arbiter",
+  "description": "Causation-and-responsibility reasoning specialist. Arbiter does NOT gather or verify evidence itself and does not call Sentinel, Trustline, Precedent, or Atlas directly — it expects ORCHESTRA to assemble and pass in findings via the task payload/context.",
+  "capabilities": [
+    {
+      "name": "reconstruct_timeline",
+      "endpoint": "/reconstruct_timeline",
+      "description": "Reconstructs a chronological sequence of events from raw evidence, logs, and claims. Does not determine responsibility splits."
+    },
+    {
+      "name": "analyze_causation",
+      "endpoint": "/analyze_causation",
+      "description": "Identifies true root cause of project delay, defect, or dispute using multi-agent evidence context. Does not retrieve contract precedents."
+    },
+    {
+      "name": "assess_responsibility",
+      "endpoint": "/assess_responsibility",
+      "description": "Attributes contractual responsibility and financial split percentage between vendor, buyer, and external factors. Does not perform verify progress audits."
+    },
+    {
+      "name": "analyze_dispute",
+      "endpoint": "/analyze_dispute",
+      "description": "Runs full dispute analysis including timeline, causation, and responsibility attribution. Does not update vendor trust scorecards."
+    },
+    {
+      "name": "run_debate",
+      "endpoint": "/run_debate",
+      "description": "Runs the 3-step adversarial debate: Buyer Advocate -> Vendor Advocate -> Judge. Does not do RAG vector precedent lookups."
+    }
+  ]
+}

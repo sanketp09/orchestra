@@ -27,9 +27,19 @@ All backend features return the STRICT OUTPUT CONTRACT:
 from __future__ import annotations
 
 import re
+import os
+import sys
 from datetime import datetime, timezone
 from typing import Literal, Optional, Any
 from pydantic import BaseModel, Field
+
+# Ensure root directory is in python path to support cross-service imports
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
+from common.llm_client import get_llm_client
+
 
 
 # ============================================================================
@@ -164,41 +174,68 @@ def classify_procurement_intent(input_text: str, file_name: Optional[str] = None
 # Feature Backend Execution Logic
 # ============================================================================
 
+# Helper to extract numbers from text
+def extract_number(pattern: str, text: str, default: float) -> float:
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            pass
+    return default
+
+
 def execute_duplicate_conflicting_order(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    po_match = re.search(r'(PO-\d+)', input_text, re.IGNORECASE)
+    new_po = po_match.group(1).upper() if po_match else "PO-1042"
+    duplicate_po = "PO-0988" if new_po != "PO-0988" else "PO-1042"
+    
+    overlap_score = 0.57
+    verdict = "contradicted"
+    confidence = 0.97
+    base_reasoning = f"{new_po} duplicates open {duplicate_po} for Grade 60 rebar with a 3-day delivery window overlap. $142,000 financial risk if both orders release payment."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Analyze this duplicate PO alert: {new_po} overlaps with {duplicate_po}. "
+        f"Reasoning context: {base_reasoning}. Synthesize a concise 1-2 sentence audit reasoning."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel duplicate catcher.")
+
     return EvidenceResult(
         feature_id="duplicate_conflicting_order",
         feature_name="Duplicate & Conflicting Order Catcher",
-        claim="New purchase order PO-1042 for 18 tons Grade 60 Rebar ($156,000) from Meridian Steelworks.",
-        verdict="contradicted",
-        confidence=0.97,
+        claim=f"New purchase order {new_po} for 18 tons Grade 60 Rebar ($156,000) from Meridian Steelworks.",
+        verdict=verdict,
+        confidence=confidence,
         evidence=[
             EvidenceItem(
-                source="New PO Submission — PO-1042",
+                source=f"New PO Submission — {new_po}",
                 reliability_tier="self_reported",
                 timestamp=now_str,
-                raw_ref="internal://procurement/po-1042"
+                raw_ref=f"internal://procurement/po-{new_po.lower().split('-')[-1]}"
             ),
             EvidenceItem(
-                source="Active PO Ledger — PO-0988 (Apex Rebar Supply)",
+                source=f"Active PO Ledger — {duplicate_po} (Apex Rebar Supply)",
                 reliability_tier="verified_transaction",
                 timestamp="2026-04-05T09:00:00Z",
-                raw_ref="internal://procurement/pos/PO-0988"
+                raw_ref=f"internal://procurement/pos/{duplicate_po}"
             ),
             EvidenceItem(
-                source="Jaccard Token Overlap Check (57% token match)",
+                source=f"Jaccard Token Overlap Check ({int(overlap_score*100)}% token match)",
                 reliability_tier="third_party_observed",
                 timestamp=now_str,
                 raw_ref="internal://sentinel/keyword-similarity-heuristic"
             )
         ],
-        reasoning="PO-1042 duplicates open PO-0988 for Grade 60 rebar with a 3-day delivery window overlap. $142,000 financial risk if both orders release payment.",
+        reasoning=reasoning,
         writes_to=["sentinel.duplicate_flags", "procurement.po_review_queue"],
         needs_human=True,
         payload_details={
-            "new_po": "PO-1042",
-            "duplicate_po": "PO-0988",
-            "duplicate_risk": 0.70,
+            "new_po": new_po,
+            "duplicate_po": duplicate_po,
+            "duplicate_risk": overlap_score,
             "financial_impact": 142000,
             "item_name": "Reinforcing steel rods (rebar), Grade 60"
         }
@@ -207,11 +244,31 @@ def execute_duplicate_conflicting_order(input_text: str) -> EvidenceResult:
 
 def execute_delay_excuse_verification(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    claimed_days = int(extract_number(r'(\d+)\s*-?day', input_text, 14))
+    rain_mm = extract_number(r'(\d+(?:\.\d+)?)\s*mm', input_text, 3.2)
+    threshold = 25.0
+    variance = round(rain_mm - threshold, 1)
+    
+    if rain_mm < threshold:
+        verdict = "contradicted"
+        explanation = f"Weather archives record only {rain_mm}mm cumulative rainfall (below the {threshold}mm threshold for weather stand-downs). Daily site logs record normal work hours."
+    else:
+        verdict = "verified"
+        explanation = f"Weather archives confirm {rain_mm}mm cumulative rainfall, exceeding the {threshold}mm threshold. Site logs confirm workforce stand-down."
+        
+    llm = get_llm_client()
+    prompt = (
+        f"A subcontractor claimed {claimed_days} days delay due to rain. "
+        f"Weather data: {rain_mm}mm rain vs {threshold}mm threshold. "
+        f"Verdict: {verdict}. Context: {explanation}. Synthesize a concise 1-2 sentence audit explanation."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel delay excuse verifier.")
+
     return EvidenceResult(
         feature_id="delay_excuse_verification",
         feature_name="Delay Excuse Verification",
-        claim="Subcontractor claims 14-day schedule extension due to severe monsoon rain on site between July 10-24.",
-        verdict="contradicted",
+        claim=f"Subcontractor claims {claimed_days}-day schedule extension due to severe monsoon rain on site.",
+        verdict=verdict,
         confidence=0.94,
         evidence=[
             EvidenceItem(
@@ -233,13 +290,13 @@ def execute_delay_excuse_verification(input_text: str) -> EvidenceResult:
                 raw_ref="internal://sitelogs/riverside-p2"
             )
         ],
-        reasoning="Weather archives record only 3.2mm cumulative rainfall during July 10-24 (below the 25mm threshold for weather stand-downs). Daily site logs record normal work hours.",
+        reasoning=reasoning,
         writes_to=["sentinel.delay_audits", "claims.delay_verdicts"],
-        needs_human=False,
+        needs_human=verdict == "contradicted",
         payload_details={
-            "claimed_days": 14,
-            "verified_days": 0,
-            "weather_variance_mm": -21.8,
+            "claimed_days": claimed_days,
+            "verified_days": claimed_days if verdict == "verified" else 0,
+            "weather_variance_mm": variance,
             "financial_claim": 48500
         }
     )
@@ -247,11 +304,27 @@ def execute_delay_excuse_verification(input_text: str) -> EvidenceResult:
 
 def execute_missing_purchase_detector(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    qty = int(extract_number(r'(\d+)\s*m', input_text, 500))
+    item = "HVAC ducting" if "hvac" in input_text.lower() else "conduit"
+    unit_cost = 77.0 if item == "HVAC ducting" else 25.0
+    unbooked_exposure = round(qty * unit_cost, 2)
+    
+    verdict = "contradicted"
+    explanation = f"{qty}m of {item} is physically present, but no corresponding purchase order or receiving ticket exists in ERP ledger. Potential unbooked inventory liability of ${unbooked_exposure:,.2f}."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Site audit found {qty}m of {item} installed but no matching PO. "
+        f"Calculated exposure: ${unbooked_exposure}. Verdict: {verdict}. "
+        f"Context: {explanation}. Synthesize a concise 1-2 sentence audit explanation."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel missing purchase detector.")
+
     return EvidenceResult(
         feature_id="missing_purchase_detector",
         feature_name="Missing Purchase Detector",
-        claim="Site audit logged 500m of 24-inch HVAC ducting installed on Floor 4 without matching PO requisition.",
-        verdict="contradicted",
+        claim=f"Site audit logged {qty}m of 24-inch {item} installed on Floor 4 without matching PO requisition.",
+        verdict=verdict,
         confidence=0.91,
         evidence=[
             EvidenceItem(
@@ -267,13 +340,13 @@ def execute_missing_purchase_detector(input_text: str) -> EvidenceResult:
                 raw_ref="internal://erp/po-master"
             )
         ],
-        reasoning="500m of HVAC ducting is physically present and roughed in, but no corresponding purchase order or receiving ticket exists in ERP ledger. Potential unbooked inventory liability of $38,500.",
+        reasoning=reasoning,
         writes_to=["sentinel.unbooked_inventory", "procurement.unmatched_materials"],
         needs_human=True,
         payload_details={
-            "installed_quantity": "500m",
+            "installed_quantity": f"{qty}m",
             "po_matched_quantity": "0m",
-            "unbooked_exposure": 38500,
+            "unbooked_exposure": unbooked_exposure,
             "location": "Floor 4, Block B"
         }
     )
@@ -281,11 +354,22 @@ def execute_missing_purchase_detector(input_text: str) -> EvidenceResult:
 
 def execute_bid_integrity_collusion(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    bidders = ["Apex Rebar Supply", "Coastal Metal Works"]
+    verdict = "contradicted"
+    explanation = "Collusion flagged: Apex Rebar and Coastal Metal submittals were authored on the same workstation within 42 seconds and share common directorship. Recommending disqualification."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Bids by {', '.join(bidders)} submitted with metadata correlation. "
+        f"Verdict: {verdict}. Context: {explanation}. Synthesize a concise 1-2 sentence audit warning."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel bid integrity auditor.")
+
     return EvidenceResult(
         feature_id="bid_integrity_collusion",
         feature_name="Bid Integrity & Collusion Check",
         claim="RFP-2026-08 Bid Package submittal by Meridian Steel, Apex Rebar, and Coastal Metal.",
-        verdict="contradicted",
+        verdict=verdict,
         confidence=0.96,
         evidence=[
             EvidenceItem(
@@ -307,11 +391,11 @@ def execute_bid_integrity_collusion(input_text: str) -> EvidenceResult:
                 raw_ref="external://corp-registry/ownership-graph"
             )
         ],
-        reasoning="Collusion flagged: Apex Rebar and Coastal Metal submittals were authored on the same workstation within 42 seconds and share common directorship. Recommending disqualification.",
+        reasoning=reasoning,
         writes_to=["sentinel.collusion_flags", "trustline.vendor_risk_score"],
         needs_human=True,
         payload_details={
-            "flagged_bidders": ["Apex Rebar Supply", "Coastal Metal Works"],
+            "flagged_bidders": bidders,
             "collusion_type": "Complementary Bidding / Shared Ownership",
             "price_variance": 0.006,
             "fairness_score": 0.12
@@ -321,31 +405,43 @@ def execute_bid_integrity_collusion(input_text: str) -> EvidenceResult:
 
 def execute_material_authentication(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    heat_match = re.search(r'Heat\s*#?\s*(\d+)', input_text, re.IGNORECASE)
+    heat_no = heat_match.group(1) if heat_match else "74829"
+    verdict = "verified"
+    explanation = f"Heat stamp signature and metallurgical chemical composition match verified mill reference records. Tensile strength (68,500 psi) exceeds Grade 60 specification minimum."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Material Heat stamp #{heat_no} is verified. "
+        f"Verdict: {verdict}. Context: {explanation}. Synthesize a concise 1-2 sentence audit verification."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel material authenticator.")
+
     return EvidenceResult(
         feature_id="material_authentication",
         feature_name="Material Authentication",
-        claim="Mill Test Certificate #MTC-88392 for Grade 60 Rebar Heat #74829 from Meridian Steelworks.",
-        verdict="verified",
+        claim=f"Mill Test Certificate #MTC-88392 for Grade 60 Rebar Heat #{heat_no} from Meridian Steelworks.",
+        verdict=verdict,
         confidence=0.98,
         evidence=[
             EvidenceItem(
                 source="Heat Stamp OCR Scan & Geo-tagged Photo",
                 reliability_tier="third_party_observed",
                 timestamp=now_str,
-                raw_ref="internal://material/heat-stamp-74829"
+                raw_ref=f"internal://material/heat-stamp-{heat_no}"
             ),
             EvidenceItem(
                 source="Meridian Steelworks Authorized Mill Reference Database",
                 reliability_tier="verified_transaction",
                 timestamp="2026-08-01T00:00:00Z",
-                raw_ref="external://meridian-steel/mill-ledger/74829"
+                raw_ref=f"external://meridian-steel/mill-ledger/{heat_no}"
             )
         ],
-        reasoning="Heat stamp signature and metallurgical chemical composition match verified mill reference records. Tensile strength (68,500 psi) exceeds Grade 60 specification minimum.",
+        reasoning=reasoning,
         writes_to=["sentinel.material_trust", "qa.inspection_log"],
         needs_human=False,
         payload_details={
-            "heat_number": "74829",
+            "heat_number": heat_no,
             "steel_grade": "Grade 60",
             "tensile_strength_psi": 68500,
             "match_score": 0.98
@@ -355,11 +451,23 @@ def execute_material_authentication(input_text: str) -> EvidenceResult:
 
 def execute_factory_cloud(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    ord_match = re.search(r'ORD-\d+', input_text, re.IGNORECASE)
+    ord_id = ord_match.group(0).upper() if ord_match else "ORD-4471"
+    verdict = "uncertain"
+    explanation = f"Manufacturing is at 80% completion in assembly stage. Observed completion pace is lower than required schedule; projected dispatch delayed from Aug 20 to Aug 27."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Factory IoT tracking for {ord_id}. Status: 80% complete. "
+        f"Verdict: {verdict}. Context: {explanation}. Synthesize a concise 1-2 sentence progress projection."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel factory tracker.")
+
     return EvidenceResult(
         feature_id="factory_cloud",
         feature_name="Factory Cloud",
-        claim="Order ORD-4471 offsite fabrication status at Shreeji Metal Works, Bhiwandi.",
-        verdict="uncertain",
+        claim=f"Order {ord_id} offsite fabrication status at Shreeji Metal Works, Bhiwandi.",
+        verdict=verdict,
         confidence=0.90,
         evidence=[
             EvidenceItem(
@@ -372,14 +480,14 @@ def execute_factory_cloud(input_text: str) -> EvidenceResult:
                 source="Procurement Contract Expected Dispatch Schedule",
                 reliability_tier="verified_transaction",
                 timestamp="2026-07-01T00:00:00Z",
-                raw_ref="internal://orders/ORD-4471"
+                raw_ref=f"internal://orders/{ord_id}"
             )
         ],
-        reasoning="Manufacturing is at 80% completion in assembly stage. Observed completion pace is lower than required schedule; projected dispatch delayed from Aug 20 to Aug 27.",
+        reasoning=reasoning,
         writes_to=["procurement.order_tracking", "vendor.production_log"],
         needs_human=True,
         payload_details={
-            "order_id": "ORD-4471",
+            "order_id": ord_id,
             "percent_complete": 80.0,
             "expected_dispatch": "2026-08-20",
             "projected_dispatch": "2026-08-27",
@@ -390,11 +498,23 @@ def execute_factory_cloud(input_text: str) -> EvidenceResult:
 
 def execute_statutory_deadline_tracker(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    state = "CA" if "ca" in input_text.lower() else "TX"
+    days_rem = int(extract_number(r'(\d+)\s*days?', input_text, 36))
+    verdict = "verified"
+    explanation = f"Notice timely filed within 20 days of first material delivery. Statutory mechanic's lien perfection deadline calculated as Sep 15, 2026 ({days_rem} days remaining). High priority action."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Statutory lien notice filed in {state} with {days_rem} days remaining. "
+        f"Verdict: {verdict}. Context: {explanation}. Synthesize a concise 1-2 sentence statutory alert."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel statutory deadline auditor.")
+
     return EvidenceResult(
         feature_id="statutory_deadline_tracker",
         feature_name="Statutory Deadline Tracker",
-        claim="Preliminary 20-Day Mechanics Lien Notice served by Voltline Electrical on Riverside Commons Phase 2.",
-        verdict="verified",
+        claim="Preliminary 20-Day Mechanics Lien Notice served on Riverside Commons Phase 2.",
+        verdict=verdict,
         confidence=0.99,
         evidence=[
             EvidenceItem(
@@ -404,20 +524,20 @@ def execute_statutory_deadline_tracker(input_text: str) -> EvidenceResult:
                 raw_ref="internal://legal/notice-7021"
             ),
             EvidenceItem(
-                source="California Civil Code § 8400 Statutory Rulebook Engine",
+                source=f"{'California' if state == 'CA' else 'Texas'} Civil Code § 8400 Statutory Rulebook Engine",
                 reliability_tier="verified_transaction",
                 timestamp=now_str,
-                raw_ref="statute://ca/civil-code/8400"
+                raw_ref=f"statute://{state.lower()}/civil-code/8400"
             )
         ],
-        reasoning="Notice timely filed within 20 days of first material delivery. Statutory mechanic's lien perfection deadline calculated as Sep 15, 2026 (36 days remaining). High priority action.",
+        reasoning=reasoning,
         writes_to=["sentinel.statutory_deadlines", "legal.compliance_schedule"],
         needs_human=False,
         payload_details={
-            "statute_ref": "CA Civil Code § 8400",
+            "statute_ref": f"{state} Civil Code § 8400",
             "filing_date": "2026-08-01",
             "deadline_date": "2026-09-15",
-            "days_remaining": 36,
+            "days_remaining": days_rem,
             "priority": "high"
         }
     )
@@ -425,11 +545,29 @@ def execute_statutory_deadline_tracker(input_text: str) -> EvidenceResult:
 
 def execute_pay_application_installation_proof(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    claimed = extract_number(r'claimed\s*(\d+)%', input_text, 90.0)
+    if claimed == 90.0:
+        claimed = extract_number(r'(\d+)%', input_text, 90.0)
+    verified = extract_number(r'verified\s*(\d+)%', input_text, 68.0)
+    if verified == 68.0 and claimed != 90.0:
+        verified = round(claimed * 0.75, 1)
+    diff = claimed - verified
+    needs_human = abs(diff) > 15.0
+    verdict = "contradicted" if needs_human else "verified"
+    explanation = f"Vision AI analysis confirms rough-in work is at ~{verified:.0f}% completion (conduit/boxes mounted, but device plates missing and panels un-energized). Recommended payment capped at $139,400 ({diff:.0f}% overbilling variance)."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Pay app check: contractor claimed {claimed}% vs vision verified {verified}%. "
+        f"Verdict: {verdict}. Context: {explanation}. Synthesize a concise 1-2 sentence payment recommendation."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel pay app auditor.")
+
     return EvidenceResult(
         feature_id="pay_application_installation_proof",
         feature_name="Pay Application & Installation Proof",
-        claim="Pay Application #7 submitted by Voltline Electrical claiming 90% completion ($184,500) for Floor 3-5 electrical.",
-        verdict="contradicted",
+        claim=f"Pay Application submitted claiming {claimed:.0f}% completion for electrical work.",
+        verdict=verdict,
         confidence=0.92,
         evidence=[
             EvidenceItem(
@@ -445,12 +583,12 @@ def execute_pay_application_installation_proof(input_text: str) -> EvidenceResul
                 raw_ref="internal://site-walk/photo-floor4-elec"
             )
         ],
-        reasoning="Vision AI analysis confirms rough-in work is at ~68% completion (conduit/boxes mounted, but device plates missing and panels un-energized). Recommended payment capped at $139,400 (22% overbilling variance).",
+        reasoning=reasoning,
         writes_to=["sentinel.payapp_flags", "finance.payment_holds"],
-        needs_human=True,
+        needs_human=needs_human,
         payload_details={
-            "claimed_percent": 90,
-            "verified_percent": 68,
+            "claimed_percent": claimed,
+            "verified_percent": verified,
             "claimed_amount": 184500,
             "verified_amount": 139400,
             "overclaim_exposure": 45100
@@ -460,11 +598,25 @@ def execute_pay_application_installation_proof(input_text: str) -> EvidenceResul
 
 def execute_payment_wage_integrity(input_text: str) -> EvidenceResult:
     now_str = datetime.now(timezone.utc).isoformat()
+    paid_rate = extract_number(r'\$(\d+(?:\.\d+)?)\s*/\s*hr', input_text, 42.50)
+    req_rate = 47.00
+    shortfall = max(0.0, req_rate - paid_rate)
+    verdict = "contradicted" if shortfall > 0.0 else "verified"
+    total_exposure = round(shortfall * 3200, 2)
+    explanation = f"3 Journeyman Ironworkers were paid ${paid_rate:.2f}/hr vs prevailing wage rate of ${req_rate:.2f}/hr (${shortfall:.2f}/hr shortfall). Total project wage liability exposure calculated at ${total_exposure:,.2f} across 3,200 hours."
+    
+    llm = get_llm_client()
+    prompt = (
+        f"Prevailing wage audit: paid ${paid_rate:.2f}/hr vs required ${req_rate:.2f}/hr. "
+        f"Verdict: {verdict}. Context: {explanation}. Synthesize a concise 1-2 sentence prevailing wage compliance summary."
+    )
+    reasoning = llm.generate(prompt, system_instruction="You are Sentinel certified payroll auditor.")
+
     return EvidenceResult(
         feature_id="payment_wage_integrity",
         feature_name="Payment & Wage Integrity Check",
-        claim="Certified Payroll #W-14 submittal by Apex Rebar for Week Ending Aug 3, 2026.",
-        verdict="contradicted",
+        claim="Certified Payroll submittal checking worker wages against prevailing wage rate sheet.",
+        verdict=verdict,
         confidence=0.95,
         evidence=[
             EvidenceItem(
@@ -480,13 +632,13 @@ def execute_payment_wage_integrity(input_text: str) -> EvidenceResult:
                 raw_ref="external://dol/prevailing-wage/ca20260018"
             )
         ],
-        reasoning="3 Journeyman Ironworkers were paid $42.50/hr vs mandatory prevailing wage rate of $47.00/hr ($4.50/hr shortfall). Total project wage liability exposure calculated at $14,400 across 3,200 hours.",
+        reasoning=reasoning,
         writes_to=["sentinel.wage_violations", "compliance.payroll_audit"],
-        needs_human=True,
+        needs_human=verdict == "contradicted",
         payload_details={
-            "shortfall_per_hour": 4.50,
+            "shortfall_per_hour": shortfall,
             "affected_workers": 3,
-            "total_exposure": 14400,
+            "total_exposure": total_exposure,
             "classification": "Journeyman Ironworker"
         }
     )

@@ -1,0 +1,31 @@
+{
+  "agent": "precedent",
+  "description": "Organizational-memory specialist. Retrieves relevant past cases (vendor performance patterns, contract clause precedents, dispute resolutions, and broader cross-project patterns) via semantic similarity search, so other findings can be grounded in what actually happened before rather than treated as novel.",
+  "capabilities": [
+    {
+      "name": "find_similar_case",
+      "endpoint": "/find_similar_case",
+      "description": "Searches historical dispute and claim archives using vector similarity to find matching precedents. Does not determine current delay causation."
+    },
+    {
+      "name": "find_similar_vendor",
+      "endpoint": "/find_similar_vendor",
+      "description": "Matches vendor profile characteristics against historical vendor records to predict dispute risk. Does not find contract clause outcomes."
+    },
+    {
+      "name": "find_similar_contract",
+      "endpoint": "/find_similar_contract",
+      "description": "Analyzes contract clause terms against historical contract disputes and resolution outcomes. Does not reconstruct project timelines."
+    },
+    {
+      "name": "find_similar_dispute",
+      "endpoint": "/find_similar_dispute",
+      "description": "Matches current dispute arguments against historical arbitration and litigation outcomes. Does not change vendor trust score."
+    },
+    {
+      "name": "retrieve_previous_outcome",
+      "endpoint": "/retrieve_previous_outcome",
+      "description": "Retrieves granular decision outcome details for a specific historical case ID. Does not perform vector search."
+    }
+  ]
+}
