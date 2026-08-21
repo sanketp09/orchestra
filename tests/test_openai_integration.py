@@ -410,4 +410,327 @@ def test_e2e_execution_level_b1():
         print(f"Step {idx+1}: ID={step_res.step_id} | Cap={step_res.capability_id} | Status={step_res.status}")
 
 
+@pytest.mark.skipif(not RUN_INTEGRATION, reason="Opt-in OpenAI integration test. Set RUN_OPENAI_INTEGRATION_TEST=true to run.")
+def test_e2e_evaluation_level_b2():
+    """
+    STEP 5 — Full E2E Integration test including Situation Analysis, Planning, Execution, and Evaluation.
+    """
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if not openai_key:
+        pytest.fail("OPENAI_API_KEY environment variable must be set to run integration tests.")
+
+    from orchestra.repository import SupabaseCaseRepository
+    from orchestra.planner import (
+        extract_information_needs,
+        evaluate_capabilities,
+        rank_candidates,
+        generate_plan,
+        validate_and_normalize_plan
+    )
+    from orchestra.registry import CapabilityRegistry
+    from orchestra.execution import ExecutionOrchestrator, StepStatus, PlanExecutionStatus
+    from orchestra.client import OrchestraClient
+    from common.schemas.task import AgentResult
+    from orchestra.evaluation import EvaluationEngine
+    import asyncio
+    from unittest.mock import MagicMock, AsyncMock
+
+    # 1. Fetch case
+    repo = SupabaseCaseRepository()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        case_ctx = loop.run_until_complete(repo.get_case_context("prj_crossrail_tunnel_systems"))
+    finally:
+        loop.close()
+
+    # 2. Situation Analysis
+    analyzer = SituationAnalyzer()
+    situation = analyzer.analyze_case(case_context=case_ctx)
+
+    # 3. Extract Needs
+    needs = extract_information_needs(situation)
+    assert len(needs) > 0
+
+    # 4. Evaluate Capabilities
+    registry = CapabilityRegistry()
+    candidates = evaluate_capabilities(needs, registry)
+
+    # 5. Rank
+    ranked_result = rank_candidates(candidates, needs, relevance_threshold=0.5)
+
+    # 6. Generate & Validate Plan
+    proposed = generate_plan(situation, needs, ranked_result.selected_candidates, registry)
+    validated = validate_and_normalize_plan(proposed, needs, ranked_result.selected_candidates, registry)
+    assert len(validated.steps) > 0
+
+    # 7. Mock Execution
+    mock_client = MagicMock(spec=OrchestraClient)
+    async def mock_execute(capability_id, payload, **kwargs):
+        return AgentResult(
+            agent=registry.get(capability_id).specialist,
+            task_id="tsk_mock_e2e_val",
+            status="COMPLETED",
+            findings=[{"message": f"Verified successfully details for {capability_id}."}]
+        )
+    mock_client.execute = AsyncMock(side_effect=mock_execute)
+
+    orchestrator = ExecutionOrchestrator(registry, mock_client)
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        exec_res = loop.run_until_complete(orchestrator.execute(
+            validated, situation, needs, case_context=case_ctx
+        ))
+    finally:
+        loop.close()
+
+    # 8. Run Hybrid evaluation
+    eval_engine = EvaluationEngine()
+    eval_res = eval_engine.evaluate(situation, needs, validated, exec_res)
+
+    assert eval_res.status is not None
+    assert len(eval_res.need_evaluations) == len(needs)
+    assert eval_res.confidence >= 0.0 and eval_res.confidence <= 1.0
+    print(f"\nEvaluation Status: {eval_res.status}")
+    print(f"Reasoning: {eval_res.reasoning}")
+
+
+@pytest.mark.skipif(not RUN_INTEGRATION, reason="Opt-in OpenAI integration test. Set RUN_OPENAI_INTEGRATION_TEST=true to run.")
+def test_e2e_replanning_level_b3():
+    """
+    STEP 6 — Full E2E Integration test demonstrating the dynamic replanning loop.
+    """
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if not openai_key:
+        pytest.fail("OPENAI_API_KEY environment variable must be set to run integration tests.")
+
+    from orchestra.repository import SupabaseCaseRepository
+    from orchestra.planner import (
+        extract_information_needs,
+        evaluate_capabilities,
+        rank_candidates,
+        generate_plan,
+        validate_and_normalize_plan
+    )
+    from orchestra.registry import CapabilityRegistry
+    from orchestra.execution import ExecutionOrchestrator, StepStatus
+    from orchestra.state import OrchestraState
+    from orchestra.client import OrchestraClient
+    from common.schemas.task import AgentResult
+    from orchestra.evaluation import EvaluationEngine
+    from orchestra.replanning import ReplanningEngine, ReplanningDecision, ReplanningHistoryEntry
+    import asyncio
+    from unittest.mock import MagicMock, AsyncMock
+
+    # 1. Fetch case
+    repo = SupabaseCaseRepository()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        case_ctx = loop.run_until_complete(repo.get_case_context("prj_crossrail_tunnel_systems"))
+    finally:
+        loop.close()
+
+    # 2. Situation Analysis
+    analyzer = SituationAnalyzer()
+    situation = analyzer.analyze_case(case_context=case_ctx)
+
+    # 3. Extract Needs
+    needs = extract_information_needs(situation)
+    assert len(needs) > 0
+
+    # 4. Evaluate Capabilities
+    registry = CapabilityRegistry()
+    candidates = evaluate_capabilities(needs, registry)
+
+    # 5. Rank
+    ranked_result = rank_candidates(candidates, needs, relevance_threshold=0.5)
+
+    # 6. Generate & Validate Plan
+    proposed = generate_plan(situation, needs, ranked_result.selected_candidates, registry)
+    validated = validate_and_normalize_plan(proposed, needs, ranked_result.selected_candidates, registry)
+    assert len(validated.steps) > 0
+
+    # 7. Mock Execution
+    mock_client = MagicMock(spec=OrchestraClient)
+    async def mock_execute(capability_id, payload, **kwargs):
+        return AgentResult(
+            agent=registry.get(capability_id).specialist,
+            task_id="tsk_mock_e2e_replan",
+            status="COMPLETED",
+            findings=[{"message": f"Successfully completed execution of {capability_id}."}]
+        )
+    mock_client.execute = AsyncMock(side_effect=mock_execute)
+
+    orchestrator = ExecutionOrchestrator(registry, mock_client)
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        exec_res = loop.run_until_complete(orchestrator.execute(
+            validated, situation, needs, case_context=case_ctx
+        ))
+    finally:
+        loop.close()
+
+    # 8. Evaluation
+    eval_engine = EvaluationEngine()
+    eval_res = eval_engine.evaluate(situation, needs, validated, exec_res)
+
+    # 9. Replanning decision and adaptation
+    state = OrchestraState(
+        run_id="run_e2e_replan_1",
+        project_id="PRJ-CROSSRAIL",
+        objective=situation.objective,
+        active_iteration=0
+    )
+    
+    replan_engine = ReplanningEngine()
+    decision, stop_reason = replan_engine.decide_replanning(state, eval_res)
+    
+    print(f"\nReplanning Decision: {decision} | Stop Reason: {stop_reason}")
+    
+    # If the evaluator decided sufficiency wasn't complete or dynamic gap occurred, simulate semantic update
+    if decision == ReplanningDecision.REPLAN or decision == ReplanningDecision.NO_REPLAN:
+        completed_outputs = [
+            {"step_id": res.step_id, "findings": res.output}
+            for res in exec_res.step_results
+        ]
+        
+        # 10. Update situation context semantically
+        updated_sit = replan_engine.update_situation(situation, completed_outputs, eval_res)
+        assert len(updated_sit.known_facts) >= len(situation.known_facts)
+        
+        # 11. Refine needs
+        refined_needs = replan_engine.refine_needs(needs, updated_sit, eval_res)
+        print(f"Refined needs count: {len(refined_needs)}")
+        
+        # 12. Run dynamic capability rescoring and new planning on refined needs
+        if refined_needs:
+            new_candidates = evaluate_capabilities(refined_needs, registry)
+            new_ranked = rank_candidates(new_candidates, refined_needs, relevance_threshold=0.5)
+            
+            # Generate next proposed plan
+            new_proposed = generate_plan(updated_sit, refined_needs, new_ranked.selected_candidates, registry)
+            new_validated = validate_and_normalize_plan(new_proposed, refined_needs, new_ranked.selected_candidates, registry)
+            
+            # Prevent duplicate steps
+            final_plan = replan_engine.prevent_duplicate_steps(new_validated, exec_res.step_results, validated.steps)
+            print(f"Next actions plan step count (duplicate filtered): {len(final_plan.steps)}")
+
+
+@pytest.mark.skipif(not RUN_INTEGRATION, reason="Opt-in OpenAI integration test. Set RUN_OPENAI_INTEGRATION_TEST=true to run.")
+def test_e2e_outcome_level_b4():
+    """
+    STEP 7 — Complete E2E integration pipeline showing synthesis, human review routing, and recording.
+    """
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if not openai_key:
+        pytest.fail("OPENAI_API_KEY environment variable must be set to run integration tests.")
+
+    from orchestra.repository import SupabaseCaseRepository
+    from orchestra.planner import (
+        extract_information_needs,
+        evaluate_capabilities,
+        rank_candidates,
+        generate_plan,
+        validate_and_normalize_plan
+    )
+    from orchestra.registry import CapabilityRegistry
+    from orchestra.execution import ExecutionOrchestrator, StepStatus
+    from orchestra.client import OrchestraClient
+    from common.schemas.task import AgentResult
+    from orchestra.evaluation import EvaluationEngine
+    from orchestra.outcome import FinalSynthesizer, OutcomeRecord, OutcomeStatus
+    from tests.test_orchestra_outcome import InMemoryOutcomeRecorder
+    import asyncio
+    from unittest.mock import MagicMock, AsyncMock
+
+    # 1. Fetch case
+    repo = SupabaseCaseRepository()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        case_ctx = loop.run_until_complete(repo.get_case_context("prj_crossrail_tunnel_systems"))
+    finally:
+        loop.close()
+
+    # 2. Situation Analysis
+    analyzer = SituationAnalyzer()
+    situation = analyzer.analyze_case(case_context=case_ctx)
+
+    # 3. Needs
+    needs = extract_information_needs(situation)
+    assert len(needs) > 0
+
+    # 4. Capabilities
+    registry = CapabilityRegistry()
+    candidates = evaluate_capabilities(needs, registry)
+
+    # 5. Rank
+    new_ranked = rank_candidates(candidates, needs, relevance_threshold=0.5)
+
+    # 6. Planning & Validation
+    proposed = generate_plan(situation, needs, new_ranked.selected_candidates, registry)
+    validated = validate_and_normalize_plan(proposed, needs, new_ranked.selected_candidates, registry)
+
+    # 7. Mock Execution
+    mock_client = MagicMock(spec=OrchestraClient)
+    async def mock_execute(capability_id, payload, **kwargs):
+        return AgentResult(
+            agent=registry.get(capability_id).specialist,
+            task_id="tsk_mock_e2e_outcome",
+            status="COMPLETED",
+            findings=[{"message": f"Successfully completed validation of {capability_id}."}]
+        )
+    mock_client.execute = AsyncMock(side_effect=mock_execute)
+
+    orchestrator = ExecutionOrchestrator(registry, mock_client)
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        exec_res = loop.run_until_complete(orchestrator.execute(
+            validated, situation, needs, case_context=case_ctx
+        ))
+    finally:
+        loop.close()
+
+    # 8. Evaluation
+    eval_engine = EvaluationEngine()
+    eval_res = eval_engine.evaluate(situation, needs, validated, exec_res)
+
+    # 9. Final Synthesis
+    synthesizer = FinalSynthesizer()
+    outcome = synthesizer.synthesize(situation, needs, exec_res, eval_res, [])
+
+    # Assertions
+    assert outcome.status is not None
+    assert outcome.recommendation is not None
+    assert len(outcome.replanning_history_summary) > 0
+
+    # 10. Persistence Recording
+    recorder = InMemoryOutcomeRecorder()
+    record = OutcomeRecord(
+        case_ref="prj_crossrail_tunnel_systems",
+        recommendation=str(outcome.recommendation),
+        confidence=outcome.confidence,
+        review_status="pending_review" if outcome.human_review_required else "approved",
+        outcome_status=str(outcome.status),
+        provenance_summary=outcome.provenance_summary
+    )
+    recorded_ok = recorder.record_outcome(record)
+    assert recorded_ok is True
+    assert len(recorder.records) == 1
+    
+    print(f"\nFinal Outcome Status: {outcome.status}")
+    print(f"Recommendation: {outcome.recommendation}")
+    print(f"Recorded OK: {recorded_ok}")
+
+
+
+
+
 

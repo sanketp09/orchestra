@@ -44,3 +44,9 @@ class OrchestraState(BaseModel):
     capability_candidates: List[Any] = Field(default_factory=list)
     plan: Optional[Any] = None
     execution: Optional[Any] = None
+    evaluation: Optional[Any] = None
+
+    # Phase 6 Extensions
+    replanning_history: List[Any] = Field(default_factory=list)
+    replanning_status: Optional[str] = None
+    active_iteration: int = 0

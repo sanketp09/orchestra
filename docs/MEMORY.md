@@ -295,6 +295,69 @@ Person 1 must build ORCHESTRA without:
   - Exposes Atlas as a first-class citizen using standard `AgentTask` -> `AgentResult` routing without introducing parallel pipelines or custom executors.
   - All 68 deterministic tests passed successfully.
 
+## RAG Shared Retrieval Infrastructure Integration Milestone (Completed)
+- **Completed on**: 2026-08-21
+- **Milestones**:
+  - Integrated the RAG implementation from Person 2 as a generic shared retrieval service located under `common/rag/`:
+    - **[`common/rag/models.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/common/rag/models.py)**: Holds standard `Chunk` and `RetrievalResult` schemas.
+    - **[`common/rag/embedding.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/common/rag/embedding.py)**: Formulates query & document embedding generation utilizing `BAAI/bge-small-en-v1.5` with a CPU character-frequency vector fallback.
+    - **[`common/rag/chunking.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/common/rag/chunking.py)**: Segments raw text using character overlaps with split fallbacks.
+    - **[`common/rag/rerank.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/common/rag/rerank.py)**: Refines result precision via `cross-encoder/ms-marco-MiniLM-L-6-v2` with an overlap-based Jaccard similarity fallback.
+    - **[`common/rag/ingestion.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/common/rag/ingestion.py)**: Orchestrates bulk ingestion pipelines for document-to-chunk mappings.
+    - **[`common/rag/retrieval.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/common/rag/retrieval.py)**: Runs generic hybrid vector-and-keyword searches by invoking pgvector/FTS search RPCs.
+  - Upgraded the Mock Supabase Client in [`common/supabase_client.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/common/supabase_client.py) to simulate `rag_vector_search` and `rag_keyword_search` RPC executions, enabling full local retrieval and cosine/keyword similarity scoring.
+  - Added deterministic tests in [`tests/test_orchestra_rag_logic.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_orchestra_rag_logic.py) (6 tests) and [`tests/test_orchestra_rag.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_orchestra_rag.py) (2 tests) verifying ingestion pipelines, hybrid query matching, metadata survival, and empty results handling.
+- **Architectural Verification**:
+  - The RAG framework remains purely generic infrastructure and is not exposed as a capability itself; instead, it runs as internal shared search routines consumed by specialists.
+  - All 76 deterministic tests passed successfully.
+
+## Phase 5 — Evaluation and Decision Sufficiency Milestone (Completed)
+- **Completed on**: 2026-08-21
+- **Milestones**:
+  - Implemented the hybrid semantic and deterministic evaluation coordinator **`EvaluationEngine`** in [`orchestra/evaluation.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/orchestra/evaluation.py):
+    - **Layer A (Deterministic)**: Maps planned steps to information needs, computes factual baseline resolution status, traces blocked dependencies to root blocker steps, and aggregates provenance origins.
+    - **Layer B (Semantic)**: Feeds boundary-restricted situation objective and execution findings context to `generate_structured` via `UnifiedLLMClient`.
+    - **Layer C (Overrides)**: Applies deterministic safety overrides to prevent semantic upgrades of unresolved high-priority needs, enforce replanning rules, preserve provenance layers (no upgrading to verified public), detect conflicting findings, and trigger human reviews.
+  - Added optional `evaluation` field in [`orchestra/state.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/orchestra/state.py) to track evaluation outcomes.
+  - Created [`tests/test_orchestra_evaluation.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_orchestra_evaluation.py) (9 unit tests) asserting sufficiency overrides, blocker tracing, sibling alternatives success, conflicting outputs, provenance bounds, and dynamic need changes.
+  - Appended opt-in E2E integration test `test_e2e_evaluation_level_b2` in [`tests/test_openai_integration.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_openai_integration.py).
+- **Architectural Verification**:
+  - The evaluation process runs fully generic without hardcoded case names or specialist names, combining strict deterministic validation constraints with semantic interpretation.
+  - All 85 deterministic tests passed successfully.
+
+## Phase 6 — Dynamic Replanning and Adaptive Execution Milestone (Completed)
+- **Completed on**: 2026-08-21
+- **Milestones**:
+  - Implemented the dynamic loop coordinator and progress detection mechanisms in [`orchestra/replanning.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/orchestra/replanning.py):
+    - **Loop Decision Guards**: Deterministically halts loops upon reaching maximum iterations, stalling progress (no increase in resolved needs or decrease in uncertainties), or detecting human review flags.
+    - **Situation Updates**: Merges execution findings into `SituationContext` semantically using `UnifiedLLMClient`, with a factual guarantee that keeps original verified facts untouched.
+    - **Refinement**: Retires resolved needs while preserving unresolved or newly arising needs.
+    - **Duplicate Prevention**: Filters out previously completed plan steps to prevent repeating specialist calls for equivalent objectives.
+  - Added optional fields to `OrchestraState` in [`orchestra/state.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/orchestra/state.py) (`replanning_history`, `replanning_status`, `active_iteration`).
+  - Wrote [`tests/test_orchestra_replanning.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_orchestra_replanning.py) (12 unit tests) verifying loops, boundaries, duplicates filtering, stall behaviors, dynamic capabilities registration, and goal shifts.
+  - Appended opt-in E2E integration test `test_e2e_replanning_level_b3` in [`tests/test_openai_integration.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_openai_integration.py).
+- **Architectural Verification**:
+  - Replanning is state-aware, bounded, registry-driven, and adapts loop behavior without case-specific routing rules or hardcoded specialist IDs.
+  - All 97 deterministic tests passed successfully.
+
+## Phase 7 — Final Synthesis, Human Review, and Outcome Recording Milestone (Completed)
+- **Completed on**: 2026-08-21
+- **Milestones**:
+  - Created the final outcome synthesis logic and models in [`orchestra/outcome.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/orchestra/outcome.py):
+    - **Models**: Built strict Pydantic schemas representing the compiled workspace decision support (`FinalOutcome`, `DecisionEvidence`, `UnresolvedIssue`, `HumanReviewRequest`).
+    - **FinalSynthesizer**: Compiles situation, execution, evaluation, and history, calling `generate_structured` on `UnifiedLLMClient` to obtain the final outcome.
+    - **Safety Overrides**: Enforces deterministic overrides that flag `HUMAN_REVIEW_REQUIRED` if the evaluation requires human review, structures actionable reviewer requests, aggregates evidence provenance totals, and prevents upgrades of synthetic/derived data.
+    - **Persistence Abstraction**: Declared a database-agnostic interface `IOutcomeRecorder` and `OutcomeRecord` format.
+  - Wrote [`tests/test_orchestra_outcome.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_orchestra_outcome.py) (7 unit tests) verifying clear proceeding outcomes, unresolved low-priority issue tracking, review requests, conflicting specialist evidence, provenance safety overrides, goal shifts, and persistence interfaces.
+  - Appended opt-in E2E integration test `test_e2e_outcome_level_b4` in [`tests/test_openai_integration.py`](file:///c:/Users/Shravanya/Desktop/ORCHESTRA%20PARENT/orchestra/tests/test_openai_integration.py).
+- **Architectural Verification**:
+  - The final layer is fully capability-driven and situation-driven, preserving provenance checks and isolating databases from core reasoning logic.
+  - All 104 deterministic tests passed successfully.
+
+
+
+
+
 
 
 
