@@ -25,6 +25,8 @@ from services.sentinel_service import router as sentinel_router, sentinel_servic
 from services.trustline_service import router as trustline_router, trustline_service
 from services.precedent_service import router as precedent_router, precedent_service
 from services.arbiter_service import router as arbiter_router, arbiter_service
+from services.compass_service import router as compass_router, compass_service
+from services.atlas_service import router as atlas_router, atlas_service
 
 app = FastAPI(title="Orchestra Person 2 Intelligence & Evidence API")
 
@@ -33,6 +35,9 @@ app.include_router(sentinel_router)
 app.include_router(trustline_router)
 app.include_router(precedent_router)
 app.include_router(arbiter_router)
+app.include_router(compass_router)
+app.include_router(atlas_router)
+
 
 # Include Legacy Sentinel Core Routers
 app.include_router(site_walk.router)
@@ -67,9 +72,10 @@ async def health():
         "system": "PERSON 2 INTELLIGENCE & EVIDENCE ENGINE",
         "database_connected": db_ok,
         "llm_available": llm_ok,
-        "specialists": ["sentinel", "trustline", "precedent", "arbiter"],
+        "specialists": ["sentinel", "trustline", "precedent", "arbiter", "compass", "atlas"],
         "features_count": len(FEATURE_METADATA)
     }
+
 
 
 @app.get("/capabilities")

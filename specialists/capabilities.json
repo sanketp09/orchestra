@@ -515,6 +515,143 @@
           "availability": "available"
         }
       ]
+    },
+    {
+      "name": "compass",
+      "availability": "available",
+      "capabilities": [
+        {
+          "id": "compass.analyze_downstream_impact",
+          "name": "Analyze Downstream Impact",
+          "description": "Analyzes downstream dependencies and consequences of a project event, decision, engineering change, procurement change, or schedule disruption.",
+          "use_when": [
+            "downstream activities may be affected",
+            "dependency relationships need to be traced",
+            "the blast radius of a disruption is uncertain",
+            "schedule or procurement consequences need to be identified",
+            "a change may affect milestones or dependent work"
+          ],
+          "does_not": [
+            "verify evidence",
+            "calculate contractor blame"
+          ],
+          "endpoint": "/compass/analyze_downstream_impact",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["subject"],
+            "optional": ["project_id", "related_entities", "known_dependencies", "schedule_events", "engineering_changes", "procurement_items", "purchase_orders"]
+          },
+          "output_schema": "AgentResult",
+          "requires": [],
+          "requires_any": ["subject"],
+          "produces": ["downstream_impacts", "critical_path_exposure", "blast_radius", "confidence", "reasoning"],
+          "availability": "available"
+        }
+      ]
+    },
+    {
+      "name": "atlas",
+      "availability": "available",
+      "capabilities": [
+        {
+          "id": "atlas.external_event",
+          "name": "Assess External Events",
+          "description": "Assess all external events for relevance to the given task.",
+          "use_when": [
+            "assessing external risk factors",
+            "gathering weather, port congestion, or traffic details"
+          ],
+          "does_not": [
+            "predict future commodity prices"
+          ],
+          "endpoint": "/atlas/external_event",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["route", "expected_arrival"],
+            "optional": ["material", "vendor_country"]
+          },
+          "output_schema": "AgentResult",
+          "requires": ["route", "expected_arrival"],
+          "requires_any": [],
+          "produces": ["findings"],
+          "availability": "available"
+        },
+        {
+          "id": "atlas.commodity",
+          "name": "Commodity Risk Assessment",
+          "description": "Determine commodity price exposure for the procurement task.",
+          "use_when": [
+            "analyzing steel, aluminum, or material price fluctuations",
+            "evaluating raw materials market exposure"
+          ],
+          "does_not": [
+            "verify vendor reliability"
+          ],
+          "endpoint": "/atlas/commodity",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["material"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["material"],
+          "requires_any": [],
+          "produces": ["findings"],
+          "availability": "available"
+        },
+        {
+          "id": "atlas.shipping",
+          "name": "Shipping Logistics Assessment",
+          "description": "Assess shipping/logistics risk for a specific shipment.",
+          "use_when": [
+            "monitoring cargo, shipment, or transport route delays",
+            "tracking weather or port congestion on shipping lanes"
+          ],
+          "does_not": [
+            "renegotiate contract terms"
+          ],
+          "endpoint": "/atlas/shipping",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["route", "expected_arrival"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["route", "expected_arrival"],
+          "requires_any": [],
+          "produces": ["findings"],
+          "availability": "available"
+        },
+        {
+          "id": "atlas.geopolitical",
+          "name": "Geopolitical Risk Assessment",
+          "description": "Determine geopolitical/trade risk for the procurement.",
+          "use_when": [
+            "evaluating vendor country tariffs or sanction risk",
+            "checking import/export trade restrictions on regions"
+          ],
+          "does_not": [
+            "audit contractor schedule progress"
+          ],
+          "endpoint": "/atlas/geopolitical",
+          "method": "POST",
+          "input_schema": "AgentTask",
+          "payload_schema": {
+            "required": ["vendor_country"],
+            "optional": []
+          },
+          "output_schema": "AgentResult",
+          "requires": ["vendor_country"],
+          "requires_any": [],
+          "produces": ["findings"],
+          "availability": "available"
+        }
+      ]
     }
   ]
 }
+
