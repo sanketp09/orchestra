@@ -87,7 +87,7 @@ def run_tests():
             }
         }
     }
-    res = client.post("/arbiter/analyze_dispute", json=payload)
+    res = client.post("/arbiter/execute", json=payload)
     assert res.status_code == 200, res.text
     data = res.json()
     print(f"  Status: {data['status']}")
@@ -134,7 +134,7 @@ def run_tests():
             {"description": "Port closure announced", "date": "2026-08-05", "source": "ev_s2_1"}
         ]
     }
-    res = client.post("/arbiter/analyze_dispute", json=payload)
+    res = client.post("/arbiter/execute", json=payload)
     assert res.status_code == 200, res.text
     data = res.json()
     print(f"  Status: {data['status']}")
@@ -163,7 +163,7 @@ def run_tests():
             {"description": "Port closure announced", "date": "2026-08-05", "source": "ev_s3_2"}
         ]
     }
-    res = client.post("/arbiter/analyze_dispute", json=payload)
+    res = client.post("/arbiter/execute", json=payload)
     assert res.status_code == 200, res.text
     data = res.json()
     print(f"  Status: {data['status']}")
@@ -186,7 +186,7 @@ def run_tests():
         "verified_facts": {},
         "event_refs": []
     }
-    res = client.post("/arbiter/analyze_dispute", json=payload)
+    res = client.post("/arbiter/execute", json=payload)
     assert res.status_code == 200, res.text
     data = res.json()
     print(f"  Status: {data['status']}")
@@ -214,7 +214,7 @@ def run_tests():
             {"description": "Shipment left Aug 15", "date": "2026-08-15", "source": "ev_s5_3"}
         ]
     }
-    res = client.post("/arbiter/analyze_dispute", json=payload)
+    res = client.post("/arbiter/execute", json=payload)
     assert res.status_code == 200, res.text
     data = res.json()
     print(f"  Status: {data['status']}")
@@ -244,7 +244,7 @@ def run_tests():
             {"description": "Rumored delay", "date": None, "source": "ev_s6_1"}
         ]
     }
-    res = client.post("/arbiter/analyze_dispute", json=payload)
+    res = client.post("/arbiter/execute", json=payload)
     assert res.status_code == 200, res.text
     data = res.json()
     print(f"  Status: {data['status']}")

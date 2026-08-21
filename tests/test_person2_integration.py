@@ -1,4 +1,10 @@
 import pytest
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from project root .env
+load_dotenv(str(Path(__file__).resolve().parents[1] / ".env"))
+
 from common.schemas.task import AgentTask, AgentResult
 from common.schemas.belief import BeliefEdge
 from common.belief_ledger.client import BeliefLedgerClient
@@ -7,7 +13,6 @@ from common.embedding_client import get_embedding_client
 
 from evidence_store.ingestion import get_ingestion_engine
 from evidence_store.retrieval import get_retrieval_engine
-
 from services.sentinel_service import sentinel_service
 from services.trustline_service import trustline_service
 from services.precedent_service import precedent_service
@@ -41,9 +46,9 @@ def test_evidence_store_ingestion_and_retrieval():
     doc = ingest.ingest_document(
         file_name="delay_claim.txt",
         content=b"Subcontractor claims 14 days delay due to heavy monsoon rain.",
-        project_id="prj_test"
+        project_id="prj_riverside"
     )
-    assert doc.evidence_id.startswith("evd_")
+    assert len(doc.evidence_id) > 0
 
     retrieval = get_retrieval_engine()
     results = retrieval.search_similar_cases("monsoon rain delay", top_k=2)
@@ -55,7 +60,7 @@ def test_sentinel_service():
     task = AgentTask(
         task_id="tsk_sentinel_1",
         capability="sentinel.verify_claim",
-        project_id="prj_test",
+        project_id="prj_riverside",
         entity_ids=["vendor_apex"],
         payload={"claim_text": "Subcontractor claims rain delay between July 10-24."}
     )
@@ -71,7 +76,7 @@ def test_trustline_service_context_aware_update():
     task_no_ext = AgentTask(
         task_id="tsk_trust_1",
         capability="trustline.update_trust",
-        project_id="prj_test",
+        project_id="prj_riverside",
         entity_ids=["vendor_apex"],
         payload={"verified_event": {"verdict": "contradicted", "type": "delay"}},
         context={}
@@ -83,7 +88,7 @@ def test_trustline_service_context_aware_update():
     task_ext = AgentTask(
         task_id="tsk_trust_2",
         capability="trustline.update_trust",
-        project_id="prj_test",
+        project_id="prj_riverside",
         entity_ids=["vendor_apex"],
         payload={
             "verified_event": {"verdict": "contradicted", "type": "delay"},
@@ -98,7 +103,7 @@ def test_precedent_service():
     task = AgentTask(
         task_id="tsk_prec_1",
         capability="precedent.find_similar_case",
-        project_id="prj_test",
+        project_id="prj_riverside",
         payload={"situation_description": "Rain delay weather claim stand down"}
     )
     result = precedent_service.execute_task(task)
@@ -110,7 +115,7 @@ def test_arbiter_service():
     task = AgentTask(
         task_id="tsk_arb_1",
         capability="arbiter.analyze_dispute",
-        project_id="prj_test",
+        project_id="prj_riverside",
         payload={"dispute_description": "Subcontractor DC-402 14-day delay claim"}
     )
     result = arbiter_service.execute_task(task)

@@ -131,6 +131,10 @@ class MockSupabaseClient:
                 self._update_payload = updates
                 return self
 
+            def delete(self):
+                self._delete_pending = True
+                return self
+
             def select(self, *args, **kwargs):
                 return self
 
@@ -149,6 +153,22 @@ class MockSupabaseClient:
 
             def execute(self):
                 rows = parent.tables.get(self.name, [])
+
+                # Apply delete if pending
+                if getattr(self, "_delete_pending", False):
+                    deleted_rows = []
+                    remaining_rows = []
+                    for row in rows:
+                        match = all(row.get(col) == val for col, val in self._filters)
+                        if match:
+                            deleted_rows.append(row)
+                        else:
+                            remaining_rows.append(row)
+                    parent.tables[self.name] = remaining_rows
+                    class MockDeleteResult:
+                        def __init__(self, data):
+                            self.data = data
+                    return MockDeleteResult(deleted_rows)
 
                 # Apply update if pending
                 if self._update_payload is not None:
@@ -239,6 +259,112 @@ class MockSupabaseClient:
                             self.data = data
 
                     return MockRpcResult(scored[:match_count])
+
+                elif self.name == "rag_vector_search":
+                    target_table = self.args.get("target_table")
+                    text_column = self.args.get("text_column")
+                    query_embedding = self.args.get("query_embedding") or []
+                    filter_project_id = self.args.get("filter_project_id")
+                    extra_filters = self.args.get("extra_filters") or {}
+                    candidate_limit = self.args.get("candidate_limit") or 20
+                    id_column = self.args.get("id_column") or "id"
+                    source_id_column = self.args.get("source_id_column") or "source_id"
+
+                    rows = parent.tables.get(target_table, [])
+                    scored = []
+                    for row in rows:
+                        if filter_project_id and row.get("project_id") != filter_project_id:
+                            continue
+                        
+                        # Apply extra_filters exact match
+                        match = True
+                        for k, v in extra_filters.items():
+                            if row.get(k) != v:
+                                match = False
+                                break
+                        if not match:
+                            continue
+
+                        # Calculate similarity
+                        row_emb = row.get("embedding")
+                        similarity = 0.5
+                        if isinstance(row_emb, list) and isinstance(query_embedding, list):
+                            try:
+                                dot_product = sum(a * b for a, b in zip(row_emb, query_embedding))
+                                magnitude1 = sum(a * a for a in row_emb) ** 0.5
+                                magnitude2 = sum(b * b for b in query_embedding) ** 0.5
+                                if magnitude1 > 0 and magnitude2 > 0:
+                                    similarity = dot_product / (magnitude1 * magnitude2)
+                            except Exception:
+                                similarity = 0.5
+
+                        # Copy all fields except embedding and search_vector to metadata
+                        metadata = {k: v for k, v in row.items() if k not in [text_column, "embedding", "search_vector"]}
+
+                        scored.append({
+                            "row_id": str(row.get(id_column)),
+                            "source_id": str(row.get(source_id_column)),
+                            "chunk_text": str(row.get(text_column)),
+                            "score": float(similarity),
+                            "metadata": metadata
+                        })
+
+                    scored.sort(key=lambda x: x["score"], reverse=True)
+                    
+                    class MockRpcResult:
+                        def __init__(self, data):
+                            self.data = data
+                    return MockRpcResult(scored[:candidate_limit])
+
+                elif self.name == "rag_keyword_search":
+                    target_table = self.args.get("target_table")
+                    text_column = self.args.get("text_column")
+                    query_text = self.args.get("query_text") or ""
+                    filter_project_id = self.args.get("filter_project_id")
+                    extra_filters = self.args.get("extra_filters") or {}
+                    candidate_limit = self.args.get("candidate_limit") or 20
+                    id_column = self.args.get("id_column") or "id"
+                    source_id_column = self.args.get("source_id_column") or "source_id"
+
+                    rows = parent.tables.get(target_table, [])
+                    scored = []
+                    query_words = set(query_text.lower().split())
+                    
+                    for row in rows:
+                        if filter_project_id and row.get("project_id") != filter_project_id:
+                            continue
+                        
+                        # Apply extra_filters exact match
+                        match = True
+                        for k, v in extra_filters.items():
+                            if row.get(k) != v:
+                                match = False
+                                break
+                        if not match:
+                            continue
+
+                        # Calculate keyword rank (overlap)
+                        text_val = str(row.get(text_column, "")).lower()
+                        overlap_count = sum(1 for w in query_words if w in text_val)
+                        score = float(overlap_count) / max(len(query_words), 1)
+
+                        # Copy all fields except embedding and search_vector to metadata
+                        metadata = {k: v for k, v in row.items() if k not in [text_column, "embedding", "search_vector"]}
+
+                        scored.append({
+                            "row_id": str(row.get(id_column)),
+                            "source_id": str(row.get(source_id_column)),
+                            "chunk_text": str(row.get(text_column)),
+                            "score": score,
+                            "metadata": metadata
+                        })
+
+                    scored.sort(key=lambda x: x["score"], reverse=True)
+
+                    class MockRpcResult:
+                        def __init__(self, data):
+                            self.data = data
+                    return MockRpcResult(scored[:candidate_limit])
 
                 class MockRpcEmptyResult:
                     def __init__(self):

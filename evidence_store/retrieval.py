@@ -93,6 +93,38 @@ class EvidenceRetrievalEngine:
         scored_cases.sort(key=lambda x: x["similarity"], reverse=True)
         return scored_cases[:top_k]
 
+    def get_case_by_id(self, case_id: str) -> Optional[Dict[str, Any]]:
+        """Direct lookup of a single historical_cases row by case_id."""
+        try:
+            res = self.supabase.table("historical_cases").select("*").eq("case_id", case_id).limit(1).execute()
+            if res.data:
+                row = res.data[0]
+                return {
+                    "case_id": row.get("case_id"),
+                    "project_id": row.get("project_id"),
+                    "vendor_id": row.get("vendor_id"),
+                    "summary": row.get("summary"),
+                    "outcome": row.get("outcome"),
+                    "dispute_type": row.get("case_type"),
+                    "details": row.get("details", {})
+                }
+        except Exception as e:
+            print(f"[EvidenceRetrievalEngine] DB select error: {e}. Falling back to in-memory lookup.")
+        
+        # Fallback to mock cases
+        for case in self.mock_cases:
+            if case.case_id == case_id:
+                return {
+                    "case_id": case.case_id,
+                    "project_id": case.project_id,
+                    "vendor_id": case.vendor_id,
+                    "summary": case.summary,
+                    "outcome": case.outcome,
+                    "dispute_type": case.dispute_type,
+                    "details": {}
+                }
+        return None
+
 
 
 _retrieval_engine_instance = None

@@ -394,6 +394,40 @@ class ArbiterService:
             causes = result.get("causes", [])
             evidence_refs = list(evidence_context.keys())
 
+            # Save to timelines and causation_results tables
+            try:
+                client = get_supabase_client()
+                if result.get("timeline"):
+                    client.table("timelines").insert(
+                        {
+                            "timeline_id": str(uuid.uuid4()),
+                            "project_id": task.project_id,
+                            "entity_ids": task.entity_ids,
+                            "events": result["timeline"]["events"],
+                            "evidence_refs": evidence_refs,
+                            "confidence": result["confidence"],
+                            "source_agent": "arbiter",
+                            "receipt_id": receipt_id
+                        }
+                    ).execute()
+
+                client.table("causation_results").insert(
+                    {
+                        "causation_result_id": str(uuid.uuid4()),
+                        "project_id": task.project_id,
+                        "case_ref": dispute_context.get("case_ref"),
+                        "causes": result["causes"],
+                        "responsibility": result["responsibility"],
+                        "evidence_refs": evidence_refs,
+                        "reasoning_summary": result["reasoning_summary"],
+                        "confidence": result["confidence"],
+                        "receipt_id": receipt_id,
+                        "source_agent": "arbiter"
+                    }
+                ).execute()
+            except Exception as exc:
+                print(f"[Supabase] Warning: Dispute persistence failed: {exc}")
+
             # Save belief edges
             for cause in causes:
                 if cause.get("confidence", 0.0) >= 0.5:

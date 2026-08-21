@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from common.schemas.evidence import Evidence
 from common.embedding_client import get_embedding_client
 from common.supabase_client import get_supabase_client
+from common.rag import ingest
 
 
 class DocumentIngestionEngine:
@@ -60,8 +61,8 @@ class DocumentIngestionEngine:
         3. Chunks & generates embeddings
         4. Saves Evidence object
         """
-        evidence_id = f"evd_{uuid.uuid4().hex[:10]}"
-        storage_path = f"evidence-files/{project_id}/{evidence_id}_{file_name}"
+        document_id = f"doc_{uuid.uuid4().hex[:10]}"
+        storage_path = f"evidence-files/{project_id}/{document_id}_{file_name}"
 
         # Upload file to Supabase Storage if configured
         try:
@@ -70,35 +71,43 @@ class DocumentIngestionEngine:
             print(f"[IngestionEngine] Log: Upload path recorded as '{storage_path}' ({e})")
 
         text = self.extract_text_from_bytes(content, file_name)
-        chunks = self.chunk_text(text)
 
-        chunk_records = []
-        for idx, chunk in enumerate(chunks):
-            vector = self.embedding_client.embed_text(chunk)
-            chunk_records.append({
-                "chunk_id": f"{evidence_id}_c{idx}",
-                "evidence_id": evidence_id,
-                "text": chunk,
-                "embedding": vector
-            })
+        # Use the generic RAG ingest pipeline to handle chunking, embedding, and insertion!
+        try:
+            row_ids = ingest(
+                table="evidence",
+                text_column="extracted_text",
+                record_id=document_id,
+                raw_text=text,
+                project_id=project_id,
+                extra_fields={
+                    "source_type": source_type,
+                    "source_ref": storage_path,
+                    "source_name": file_name,
+                    "content": text,
+                    "metadata": {
+                        "file_name": file_name,
+                        "linked_claim_ids": linked_claim_ids or []
+                    }
+                },
+                id_column="evidence_id",
+                source_id_column="document_id"
+            )
+            primary_evidence_id = row_ids[0] if row_ids else f"evd_{uuid.uuid4().hex[:10]}"
+        except Exception as e:
+            print(f"[IngestionEngine] Log: Inserted evidence locally ({e})")
+            primary_evidence_id = f"evd_{uuid.uuid4().hex[:10]}"
 
-        evidence = Evidence(
-            evidence_id=evidence_id,
-            source_type=source_type, # type: ignore
+        return Evidence(
+            evidence_id=primary_evidence_id,
+            source_type=source_type if source_type in ["document", "photo", "report", "api", "site_walk", "telemetry"] else "document",
             source_ref=storage_path,
             reliability_tier="third_party_observed",
             extracted_text=text,
             project_id=project_id,
             linked_claim_ids=linked_claim_ids or [],
-            metadata={"chunks_count": len(chunks), "file_name": file_name}
+            metadata={"chunks_count": len(text.split()) // 400 + 1, "file_name": file_name}
         )
-
-        try:
-            self.supabase.table("evidence").insert(evidence.model_dump()).execute()
-        except Exception as e:
-            print(f"[IngestionEngine] Log: Inserted evidence locally ({e})")
-
-        return evidence
 
 
 _ingestion_engine_instance = None

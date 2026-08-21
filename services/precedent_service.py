@@ -77,7 +77,6 @@ class PrecedentService:
             return self.retrieve_previous_outcome(task)
         else:
             return self._error_result(task.task_id, "INVALID_INPUT", f"Unknown capability: {cap_name}")
-
     def _create_receipt(self, task_id: str, summary: str, confidence: float, reasoning: str, evidence_ids: List[str]) -> Receipt:
         receipt_id = f"rcpt_precedent_{uuid.uuid4().hex[:8]}"
         inputs_hash = hashlib.sha256(f"{task_id}:{summary}".encode()).hexdigest()[:16]
@@ -91,6 +90,26 @@ class PrecedentService:
             evidence_ids=evidence_ids,
             reasoning=reasoning
         )
+
+    def _persist_receipt(self, receipt: Receipt, project_id: Optional[str], capability: str):
+        from common.supabase_client import get_supabase_client
+        db_payload = {
+            "receipt_id": receipt.receipt_id,
+            "project_id": project_id,
+            "agent": "precedent",
+            "task_id": receipt.task_id,
+            "capability": capability,
+            "evidence_ids": receipt.evidence_ids,
+            "summary": receipt.output_summary,
+            "metadata": {
+                "confidence": receipt.confidence,
+                "reasoning": receipt.reasoning or ""
+            }
+        }
+        try:
+            get_supabase_client().table("receipts").insert(db_payload).execute()
+        except Exception as e:
+            print(f"[Receipts] Warning: Failed to persist receipt: {e}")
 
     def _error_result(self, task_id: str, code: str, message: str, retryable: bool = False) -> AgentResult:
         import uuid
@@ -131,6 +150,7 @@ class PrecedentService:
             synthesis = llm_client.generate(prompt=prompt, system_instruction="You are Precedent intelligence search assistant.")
 
             receipt = self._create_receipt(task.task_id, f"Found {len(cases)} Precedent Cases", 0.92, synthesis, [c["case_id"] for c in cases])
+            self._persist_receipt(receipt, task.project_id, task.capability)
 
             # Record edge to Belief Graph
             if cases:
@@ -184,10 +204,13 @@ class PrecedentService:
             return self._error_result(task.task_id, "MISSING_REQUIRED_CONTEXT", "case_id is required.")
 
         try:
-            cases = retrieval_engine.search_similar_cases(case_id, top_k=1)
-            res = cases[0] if cases else {"case_id": case_id, "outcome": "Claim denied due to unverified weather log variance."}
+            res = retrieval_engine.get_case_by_id(case_id)
+            if not res:
+                return self._error_result(task.task_id, "NOT_FOUND", f"Case {case_id} not found.")
 
             receipt = self._create_receipt(task.task_id, f"Retrieved Outcome for {case_id}", 0.98, str(res["outcome"]), [case_id])
+            self._persist_receipt(receipt, task.project_id, task.capability)
+
             return AgentResult(
                 agent="precedent",
                 task_id=task.task_id,
