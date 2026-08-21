@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Compass Test Console</title>
+<style>
+  body {font-family: Arial, sans-serif; margin: 2rem; background:#f9f9f9;}
+  h1 {color:#333;}
+  textarea {width:100%; height:300px; font-family: monospace; padding:10px;}
+  button {padding:10px 20px; font-size:1rem; margin-top:10px; cursor:pointer;}
+  .spinner {
+    border: 4px solid #f3f3f3; border-top:4px solid #3498db; border-radius:50%; width:24px; height:24px; animation:spin 1s linear infinite; margin-left:10px; display:inline-block; vertical-align: middle;
+  }
+  @keyframes spin {0% {transform: rotate(0deg);} 100% {transform: rotate(360deg);} }
+  .section {margin-top:20px; background:#fff; padding:15px; border-radius:5px; box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+  .raw-json {white-space: pre-wrap; background:#eee; padding:10px; border-radius:4px; display:none;}
+  .toggle {color:#0066cc; cursor:pointer; text-decoration:underline;}
+</style>
+</head>
+<body>
+<h1>Compass Test Console</h1>
+<p>Decision Synthesis Test Console</p>
+<div class="section">
+  <label for="payload"><strong>JSON INPUT</strong></label>
+  <textarea id="payload">{
+  "task_id": "demo_001",
+  "capability": "compass.recommend",
+  "project_id": "construction_project_001",
+  "entity_ids": ["vendor_A", "vendor_B"],
+  "payload": {},
+  "context": {
+    "situation_id": "vendor_selection_001",
+    "sentinel": {"finding": "Vendor A's manufacturing claim is not sufficiently supported.", "confidence": 0.86},
+    "trustline": {"finding": "Vendor A reliability has declined.", "confidence": 0.80},
+    "precedent": {"finding": "Similar situations involving Vendor A resulted in delays.", "confidence": 0.84},
+    "arbiter": {"finding": "Available evidence indicates Vendor A contributed significantly to previous delivery delays.", "confidence": 0.88},
+    "atlas": {"finding": "Current external logistics conditions are stable.", "confidence": 0.75},
+    "rag": {"historical_information": ["Vendor B successfully delivered similar materials on a previous project."]},
+    "ledger": {"relevant_memory": ["Previous project managers recorded positive experience with Vendor B."]}
+  }
+}
+</textarea>
+  <br />
+  <button id="runBtn">Run Compass</button>
+  <span id="loading" style="display:none;">Compass is analyzing the situation...<div class="spinner"></div></span>
+  <div id="error" style="color:red; margin-top:10px;"></div>
+</div>
+<div class="section" id="result" style="display:none;">
+  <h3>Result</h3>
+  <p><strong>DECISION</strong>: <span id="decision"></span></p>
+  <p><strong>WHY THIS DECISION</strong>: <span id="rationale"></span></p>
+  <p><strong>CONTRIBUTING FACTORS</strong>:</p>
+  <ul id="factors"></ul>
+  <p><strong>COST IMPACT</strong>: <span id="cost"></span></p>
+  <p><strong>SCHEDULE IMPACT</strong>: <span id="schedule"></span></p>
+  <p><strong>RISK EXPOSURE</strong>: <span id="risk"></span></p>
+  <p><strong>CONFIDENCE</strong>: <span id="confidence"></span></p>
+  <p><strong>ALTERNATIVES CONSIDERED</strong>:</p>
+  <ul id="alternatives"></ul>
+  <p><strong>RECEIPT ID</strong>: <span id="receipt"></span></p>
+  <p class="toggle" onclick="toggleRaw()">View Raw JSON</p>
+  <div class="raw-json" id="raw"></div>
+</div>
+<script>
+function toggleRaw(){
+  const raw=document.getElementById('raw');
+  raw.style.display=raw.style.display==='none'?'block':'none';
+}
+document.getElementById('runBtn').addEventListener('click', async()=>{
+  const payload=document.getElementById('payload').value;
+  const errorDiv=document.getElementById('error');
+  const loading=document.getElementById('loading');
+  const resultDiv=document.getElementById('result');
+  errorDiv.textContent='';
+  resultDiv.style.display='none';
+  try{ JSON.parse(payload); }catch(e){ errorDiv.textContent='Invalid JSON. Please correct the input.'; return; }
+  loading.style.display='inline-block';
+  try{
+    const resp=await fetch('/compass/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:payload});
+    const data=await resp.json();
+    if(!resp.ok){ throw new Error(data.detail||'Unknown error'); }
+    // show result
+    const rec=data.findings[0].data;
+    document.getElementById('decision').textContent=rec.recommendation||'';
+    document.getElementById('rationale').textContent=rec.rationale||'';
+    const factors=document.getElementById('factors'); factors.innerHTML=''; rec.contributing_factors?.forEach(f=>{const li=document.createElement('li');li.textContent=f;factors.appendChild(li);});
+    document.getElementById('cost').textContent=rec.cost_impact||'';
+    document.getElementById('schedule').textContent=rec.schedule_impact||'';
+    document.getElementById('risk').textContent=rec.risk_exposure||'';
+    document.getElementById('confidence').textContent=rec.confidence;
+    const alts=document.getElementById('alternatives'); alts.innerHTML=''; rec.alternatives_considered?.forEach(a=>{const li=document.createElement('li');li.textContent=a;alts.appendChild(li);});
+    document.getElementById('receipt').textContent=data.receipt_id||'';
+    document.getElementById('raw').textContent=JSON.stringify(data,null,2);
+    resultDiv.style.display='block';
+  }catch(err){
+    errorDiv.textContent='Compass request failed: '+err.message;
+  }finally{ loading.style.display='none'; }
+});
+</script>
+</body>
+</html>
