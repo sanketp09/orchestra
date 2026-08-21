@@ -1,0 +1,23 @@
+# .gitignore
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env.example
+
+# Virtual env
+venv/
+.env/
+.venv/
+
+# Streamlit
+.streamlit/
+
+# Python cache
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
