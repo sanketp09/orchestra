@@ -59,11 +59,33 @@ def test_data_center_case_structure():
         assert po["origin"] == "synthetic_augmented"
 
 
+def test_tsmc_case_structure():
+    """Verify that the TSMC Case 3 dictionary matches the expected structure and contains 3 vendors."""
+    tsmc = ALL_CASES["prj_tsmc_arizona_fab"]
+    assert tsmc["project"]["project_id"] == "prj_tsmc_arizona_fab"
+    assert tsmc["project"]["origin"] == "verified_public"
+    assert len(tsmc["vendors"]) == 3
+    assert len(tsmc["procurement_items"]) == 2
+    assert len(tsmc["purchase_orders"]) == 2
+    assert len(tsmc["engineering_changes"]) == 1
+    assert len(tsmc["schedule_events"]) == 2
+    assert len(tsmc["vendor_performances"]) == 2
+    assert len(tsmc["claims"]) == 1
+    assert len(tsmc["evidence"]) == 5
+
+    # Check that origins are correctly categorized
+    assert tsmc["evidence"][0]["origin"] == "verified_public"
+    assert tsmc["evidence"][1]["origin"] == "verified_public"
+    assert tsmc["evidence"][2]["origin"] == "synthetic_augmented"
+    assert tsmc["vendors"][0]["origin"] == "synthetic_augmented"
+
+
 def test_all_cases_mapping():
-    """Verify the global cases registry contains both cases."""
+    """Verify the global cases registry contains all three cases."""
     assert "prj_crossrail_tunnel_systems" in ALL_CASES
     assert "prj_data_center_dpr" in ALL_CASES
-    assert len(ALL_CASES) == 2
+    assert "prj_tsmc_arizona_fab" in ALL_CASES
+    assert len(ALL_CASES) == 3
 
 
 # ============================================================================
@@ -96,6 +118,17 @@ async def test_fake_repository_loads_contexts():
     assert dpr_ctx.purchase_orders[0].po_id == "po_dc_pipes_505"
     assert len(dpr_ctx.claims) == 1
     assert len(dpr_ctx.evidence) == 3
+
+    # 3. Load TSMC
+    tsmc_ctx = await repo.get_case_context("prj_tsmc_arizona_fab")
+    assert isinstance(tsmc_ctx, NormalizedCaseContext)
+    assert tsmc_ctx.project.project_id == "prj_tsmc_arizona_fab"
+    assert len(tsmc_ctx.vendors) == 3
+    assert tsmc_ctx.vendors[0].vendor_id == "vendor_phoenix_hvac_solutions"
+    assert len(tsmc_ctx.purchase_orders) == 2
+    assert tsmc_ctx.purchase_orders[0].po_id == "po_cleanroom_handlers_701"
+    assert len(tsmc_ctx.claims) == 1
+    assert len(tsmc_ctx.evidence) == 5
 
 
 @pytest.mark.asyncio

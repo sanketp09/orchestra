@@ -1,4 +1,4 @@
-from orchestra.cases_data import crossrail_case, data_center_case
+from orchestra.cases_data import crossrail_case, data_center_case, tsmc_case
 
 CROSSRAIL_CASE = {
     "project": crossrail_case.PROJECT,
@@ -26,7 +26,21 @@ DATA_CENTER_CASE = {
     "evidence": data_center_case.EVIDENCE,
 }
 
+TSMC_CASE = {
+    "project": tsmc_case.PROJECT,
+    "sources": tsmc_case.SOURCES,
+    "vendors": tsmc_case.VENDORS,
+    "procurement_items": tsmc_case.PROCUREMENT_ITEMS,
+    "purchase_orders": tsmc_case.PURCHASE_ORDERS,
+    "engineering_changes": tsmc_case.ENGINEERING_CHANGES,
+    "schedule_events": tsmc_case.SCHEDULE_EVENTS,
+    "vendor_performances": tsmc_case.VENDOR_PERFORMANCES,
+    "claims": tsmc_case.CLAIMS,
+    "evidence": tsmc_case.EVIDENCE,
+}
+
 ALL_CASES = {
     crossrail_case.PROJECT_ID: CROSSRAIL_CASE,
     data_center_case.PROJECT_ID: DATA_CENTER_CASE,
+    tsmc_case.PROJECT_ID: TSMC_CASE,
 }

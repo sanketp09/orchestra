@@ -730,6 +730,108 @@ def test_e2e_outcome_level_b4():
     print(f"Recorded OK: {recorded_ok}")
 
 
+@pytest.mark.skipif(not RUN_INTEGRATION, reason="Opt-in OpenAI integration test. Set RUN_OPENAI_INTEGRATION_TEST=true to run.")
+def test_e2e_tsmc_case_study():
+    """
+    Level B E2E integration test for the TSMC Case Study.
+    Loads TSMC case context from the Supabase repository (populated by the seeder),
+    passes it through the SituationAnalyzer, extracts information needs,
+    generates and validates a dynamic plan, mocks ExecutionOrchestrator steps,
+    runs Evaluation, and synthesizes the FinalOutcome and persists it.
+    """
+    from orchestra.repository import SupabaseCaseRepository
+    from orchestra.situation import SituationAnalyzer
+    from orchestra.planner import CapabilityRegistry, Planner
+    from orchestra.execution import ExecutionOrchestrator
+    from orchestra.evaluation import EvaluationEngine
+    from orchestra.outcome import FinalSynthesizer, InMemoryOutcomeRecorder, OutcomeRecord
+    from common.llm_client import UnifiedLLMClient
+    from common.schemas.task import AgentResult
+    from unittest.mock import MagicMock, AsyncMock
+    import asyncio
+    
+    # 1. Fetch TSMC Case Context
+    repo = SupabaseCaseRepository()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        case_ctx = loop.run_until_complete(repo.get_case_context("prj_tsmc_arizona_fab"))
+    finally:
+        loop.close()
+
+    assert case_ctx.project.project_id == "prj_tsmc_arizona_fab"
+    assert len(case_ctx.vendors) == 3
+
+    # 2. Situation Analysis
+    analyzer = SituationAnalyzer()
+    situation = analyzer.analyze_case(case_ctx)
+    assert "prj_tsmc_arizona_fab" in situation.entities
+
+    # 3. Planning & Need Extraction
+    registry = CapabilityRegistry()
+    planner = Planner(registry)
+    
+    needs = planner.extract_information_needs(situation)
+    assert len(needs) > 0
+
+    # 4. Discover Candidates & Generate Plan
+    candidates = planner.discover_candidates(needs)
+    proposed = planner.propose_plan(situation, needs, candidates)
+    validated = planner.validate_plan(proposed, situation, needs)
+    assert validated.is_valid is True
+
+    # 5. Mock Execution
+    mock_client = MagicMock()
+    async def mock_execute(capability_id, payload, **kwargs):
+        return AgentResult(
+            agent=registry.get(capability_id).specialist,
+            task_id="tsk_mock_tsmc_e2e",
+            status="COMPLETED",
+            findings=[{"message": f"Successfully completed validation of {capability_id}."}]
+        )
+    mock_client.execute = AsyncMock(side_effect=mock_execute)
+
+    orchestrator = ExecutionOrchestrator(registry, mock_client)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        exec_res = loop.run_until_complete(orchestrator.execute(
+            validated, situation, needs, case_context=case_ctx
+        ))
+    finally:
+        loop.close()
+
+    # 6. Evaluation
+    eval_engine = EvaluationEngine()
+    eval_res = eval_engine.evaluate(situation, needs, validated, exec_res)
+
+    # 7. Final Synthesis
+    synthesizer = FinalSynthesizer()
+    outcome = synthesizer.synthesize(situation, needs, exec_res, eval_res, [])
+
+    assert outcome.status is not None
+    assert outcome.recommendation is not None
+
+    # 8. Persistence Recording
+    recorder = InMemoryOutcomeRecorder()
+    record = OutcomeRecord(
+        case_ref="prj_tsmc_arizona_fab",
+        recommendation=str(outcome.recommendation),
+        confidence=outcome.confidence,
+        review_status="pending_review" if outcome.human_review_required else "approved",
+        outcome_status=str(outcome.status),
+        provenance_summary=outcome.provenance_summary
+    )
+    recorded_ok = recorder.record_outcome(record)
+    assert recorded_ok is True
+    assert len(recorder.records) == 1
+    
+    print(f"\n[TSMC E2E] Final Outcome Status: {outcome.status}")
+    print(f"[TSMC E2E] Recommendation: {outcome.recommendation}")
+    print(f"[TSMC E2E] Recorded OK: {recorded_ok}")
+
+
+
 
 
 

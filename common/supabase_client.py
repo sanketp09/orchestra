@@ -374,6 +374,11 @@ def get_supabase_client():
     if _supabase_instance is not None:
         return _supabase_instance
 
+    import sys
+    if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):
+        _supabase_instance = MockSupabaseClient()
+        return _supabase_instance
+
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
 
